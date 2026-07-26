@@ -466,9 +466,11 @@ async def token_generator_page(request: Request, user_id: str = "", token: str =
             request,
             state="error",
             message=(
-                "credentials.json is missing on the bot host. The owner must add "
-                "Google OAuth client credentials before tokens can be generated."
+                "credentials.json is missing on the bot host, so Google "
+                "sign-in can't start."
             ),
+            # rendered as escaped values by the template, never as HTML
+            fix_callback=f"{Config.BASE_URL.rstrip('/')}/app/token-generator/callback",
         )
     if not Config.BASE_URL:
         return _token_page(

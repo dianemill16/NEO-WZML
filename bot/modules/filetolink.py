@@ -85,12 +85,21 @@ async def _build_links(source_msg, title="Link Generated"):
     """Copy one media message into the bin chat and render its links.
     Returns (text, markup) or raises."""
     bin_chat = _bin_chat()
-    stored = await TgClient.bot.copy_message(
-        chat_id=bin_chat,
-        from_chat_id=source_msg.chat.id,
-        message_id=source_msg.id,
-        disable_notification=True,
+    # Copy the message object we already hold rather than
+    # Client.copy_message(), which re-fetches by id — that fetch comes
+    # back empty wherever the bot can't read history (groups without
+    # admin/privacy-off), and Message.copy() then silently returns None.
+    stored = await source_msg.copy(
+        chat_id=bin_chat, disable_notification=True
     )
+    if isinstance(stored, list):
+        stored = stored[0] if stored else None
+    if stored is None:
+        raise ValueError(
+            "Telegram refused to copy this message. If it's in a group, "
+            "make the bot an admin there (or disable its privacy mode) so "
+            "it can read the file."
+        )
 
     from web.streamer import make_path
 
@@ -134,10 +143,12 @@ async def _reply_links(message, source_msg, title="Link Generated", status=None)
     try:
         text, markup = await _build_links(source_msg, title)
     except Exception as e:
-        LOGGER.error(f"FileToLink: {e}")
+        LOGGER.error(f"FileToLink: {e}", exc_info=True)
         err = (
-            "Couldn't store the file — is the bot an admin in the bin chat?\n"
-            f"<code>{e}</code>"
+            "<blockquote><b>✕ Couldn't generate the link</b></blockquote>\n"
+            f"┃ <code>{e}</code>\n\n"
+            f"┃ Check that the bot is an admin in the bin chat\n"
+            f"┃ (<code>{_bin_chat()}</code>) and can read the source file."
         )
         if status:
             await edit_message(status, err)

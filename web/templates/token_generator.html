@@ -88,6 +88,34 @@
           <div class="glyph bad"><i class="fa-solid fa-triangle-exclamation"></i></div>
           <div class="lead">Something went wrong</div>
           <p class="body">{{ message }}</p>
+
+          {% if fix_callback %}
+          <div class="steps">
+            <div class="step">
+              <span class="num">1</span>
+              <span>
+                In Google Cloud Console, create an OAuth client of type
+                <b>Web application</b>.
+              </span>
+            </div>
+            <div class="step">
+              <span class="num">2</span>
+              <span>
+                Add this as an <b>authorized redirect URI</b>:<br />
+                <code style="word-break: break-all">{{ fix_callback }}</code>
+              </span>
+            </div>
+            <div class="step">
+              <span class="num">3</span>
+              <span>
+                Upload the downloaded <b>credentials.json</b> through
+                <b>/bsetting → Private Files</b>, then run
+                <b>/tokengen</b> again.
+              </span>
+            </div>
+          </div>
+          {% endif %}
+
           <a class="u-btn ghost" href="/"><i class="fa-solid fa-house"></i> Home</a>
         </div>
 

@@ -80,10 +80,27 @@
         align-items: stretch;
       }
       .copy-row .u-pre {
-        flex: 1;
+        /* min-width:0 lets the box shrink inside the flex row instead of
+           collapsing to one character per line */
+        flex: 1 1 auto;
+        min-width: 0;
         margin: 0;
-        display: flex;
-        align-items: center;
+        display: block;
+        line-height: 1.5;
+        max-height: 5.5rem;
+        overflow-y: auto;
+      }
+      .copy-row .u-btn {
+        flex: 0 0 auto;
+        width: 48px;
+        padding: 0;
+        align-self: stretch;
+      }
+      /* the card already carries a big Download button, so the header
+         copy collapses to its icon before it can overflow */
+      @media (max-width: 430px) {
+        .u-header .u-btn span { display: none; }
+        .u-header .u-btn { padding: 0.7rem 0.85rem; }
       }
     </style>
   </head>
@@ -95,8 +112,8 @@
           <span class="u-logo-text">NEO-WZML</span>
           <span class="u-tag">Ultra</span>
         </a>
-        <a class="u-btn ghost" href="{{ download_url }}">
-          <i class="fa-solid fa-download"></i> Download
+        <a class="u-btn ghost" href="{{ download_url }}" title="Download">
+          <i class="fa-solid fa-download"></i> <span>Download</span>
         </a>
       </div>
     </header>

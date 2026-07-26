@@ -64,6 +64,8 @@ body {
   gap: 0.75rem;
   text-decoration: none;
   color: inherit;
+  /* let the wordmark give way before anything overflows the header */
+  min-width: 0;
 }
 .u-logo-mark {
   width: 40px;
@@ -86,6 +88,9 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .u-tag {
   font-size: 0.62rem;
@@ -280,6 +285,8 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent-primary); }
 @media (max-width: 560px) {
   .u-wrap { padding: 1.25rem 1rem 2rem; }
   .u-card { padding: 1.15rem; }
-  .u-btn { flex: 1 1 100%; }
+  /* full-width only inside action rows — a blanket .u-btn rule makes
+     buttons sitting beside other content (copy boxes) eat the row */
+  .u-actions > .u-btn { flex: 1 1 100%; }
   .u-logo-text { font-size: 1rem; }
 }

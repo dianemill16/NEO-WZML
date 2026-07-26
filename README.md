@@ -5,9 +5,11 @@
     <img src="https://iili.io/FLRJNMG.th.png" alt="NEO-WZML Logo" width="140" />
   </a>
 
-# NEO-WZML
+# NEO-WZML ULTRA
 
 **A multi-functional Telegram bot to download from anywhere — torrents, Mega, TeraBox, YouTube, Google Drive, rclone, etc — and upload to Telegram, Cloud Drives, TeraBox, DDLs, or any rclone remote. Built-in FFmpeg processing, archive handling, torrent search, RSS monitoring, and web UI for file selection. Based on WZML-X**
+
+**ULTRA adds:** multi-bot accelerated transfers, a visual encoding-profile builder, a FileToLink streaming gateway, advanced auto-renaming, and a matching web + chat theme.
 
 [![Version](https://img.shields.io/badge/Version-1.1.1-2ea043)](https://github.com/irisXDR/NEO-WZML)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -28,6 +30,7 @@
 ## 📚 Table of Contents
 
 - [✨ Why NEO-WZML](#-why-neo-wzml)
+- [⚡ ULTRA Features](#-ultra-features)
 - [🚀 Highlights](#-highlights)
 - [⚡ Quick Start](#-quick-start)
 - [💬 Commands](#-commands)
@@ -52,6 +55,99 @@ NEO-WZML is built for people who move a lot of files through Telegram and cloud 
 - 🗜️ **Archive workflow:** extract, password-protected ZIPs, image-only ZIPs, split archive handling, and 7z-backed progress.
 - 🛡️ **Operational controls:** MongoDB persistence, queues, per-user limits, cooldowns, verification, auth gates, and safe group behavior.
 - 🐳 **Docker-first deployment:** Compose setup with optional Gluetun scaffolding for VPN-routed torrent traffic.
+
+---
+
+## ⚡ ULTRA Features
+
+Everything below is exclusive to the ULTRA branch.
+
+### 🚀 Hyper transfers (multi-bot)
+
+Add extra bot tokens and transfers run across all of them at once instead of one
+stream. Aggregate speed scales with the number of helper bots.
+
+- **Downloads** split a file into ranges fetched in parallel by every helper bot.
+- **Uploads** pre-upload several files concurrently while a single sender posts
+  them in strict order — so **series episodes and split parts never land out of
+  sequence**.
+- Falls back to the normal single-bot path automatically if a helper can't post.
+
+```python
+HELPER_TOKENS = "token1 token2 token3"   # space-separated
+USE_HYPER = True
+HYPER_THREADS = 0                        # 0 = auto
+```
+
+> All helper bots must be admins in `LEECH_DUMP_CHAT`.
+
+### 🎬 Encoding profiles (visual builder)
+
+Build FFmpeg presets in a web UI instead of writing command lines —
+**/usetting → FF Media Settings → 🎬 Encode Profiles**.
+
+- Codecs: `libsvtav1`, `libx265`, `libx264`, VP9, or stream copy, each emitted
+  correctly (`-svtav1-params` / `-x265-params` bundles, `hvc1` tagging for HEVC).
+- Presets follow the codec — SVT-AV1 `0-13`, named presets elsewhere.
+- Audio: Opus / AAC / MP3 / AC3 / FLAC / copy, with bitrate, channels and VBR.
+- Subtitle keep-or-strip, per-type track selection, metadata and disposition maps
+  (including stream-scoped keys such as `s:a:0`).
+- Starter templates, live command preview, and profiles you can reopen, rename,
+  or star as your default.
+
+Run one on any task with `-ff <name>`.
+
+### 🔗 FileToLink streaming gateway
+
+Turn any Telegram file into direct **streaming + download** URLs with HTTP range
+support, playable in VLC, MX Player or the browser.
+
+| Usage | Result |
+|-------|--------|
+| Reply to a file with `/link` | Stream + download links |
+| `/link 5` | Batch: that file and the next 4 (max 50) |
+| Send a file to the bot in PM | Links generated automatically |
+| `/link status` | Stream-pool health |
+
+```python
+FILETOLINK_ENABLED = True
+FILETOLINK_CHAT = ""      # falls back to LEECH_DUMP_CHAT
+FILETOLINK_AUTO = True    # per-user opt-out in /usetting
+```
+
+### ✏️ Advanced auto-rename
+
+Restructure messy filenames with a template — `/autorename`, or `AUTO_RENAME`
+globally.
+
+```text
+Input:    messy.show.s1.e4.1080p.mkv
+Template: [MyGroup] {title} - S{season}E{episode} [{quality}]
+Output:   [MyGroup] Messy Show - S01E04 [1080p].mkv
+```
+
+Placeholders: `{title}` `{season}` `{episode}` `{quality}` `{year}`
+(`{season_raw}` / `{episode_raw}` for unpadded numbers).
+
+### 🔑 `/tokengen` — personal Drive tokens
+
+Users generate their own Google Drive `token.pickle` through a browser OAuth
+flow — no `credentials.json` needed on the host. Each user brings their own
+OAuth client (upload `credentials.json` or paste the client ID/secret), and the
+client secret never travels through the redirect URL.
+
+### 🎨 ULTRA theme
+
+Chat replies and every web page share one design language. Inline button accents
+are configurable via `BUTTON_STYLE` in `/bsetting`, and the chat theme via
+`BOT_THEME` (`ultra` by default, `minimal` for the previous look).
+
+### ⚙️ Stability
+
+- `ARIA2_MAX_DL_SPEED` caps aria2's aggregate rate so a fast mirror can't
+  saturate the VPS disk/NIC and freeze the machine.
+- Transfers run on [wzgram](https://github.com/rjriajul/wzgram), a Pyrogram-
+  compatible client with Rust-backed crypto.
 
 ---
 
@@ -88,7 +184,7 @@ NEO-WZML is built for people who move a lot of files through Telegram and cloud 
 | `-z` / `-e` | Compress or extract before upload |
 | `-zim` | ZIP only images into `Images.zip`, keeping videos/files normal |
 | `-mv` | Merge folder videos into one `.mkv` with FFmpeg concat |
-| `-ff` | Run configured FFmpeg command presets |
+| `-ff` | Run an FFmpeg preset — build them visually in `/usetting` (**ULTRA**) |
 | `-ss` / `-sv` | Generate screenshots or sample videos |
 | Metadata tools | Apply title, audio, video, and subtitle metadata |
 | Filename rules | Prefixes, suffixes, regex swaps, and cleanup rules |
@@ -137,6 +233,16 @@ Recommended for the full experience:
 | `TERABOX_ENABLED` | Enable TeraBox integration (default: `True`) |
 | `DEFAULT_UPLOAD` | Default upload cycling: `rc` → `gd` → `tbx` (TeraBox) |
 
+ULTRA additions:
+
+| Variable | Purpose |
+|----------|---------|
+| `HELPER_TOKENS` / `USE_HYPER` | Extra bot tokens for multi-bot accelerated transfers |
+| `FILETOLINK_ENABLED` / `FILETOLINK_CHAT` | Streaming gateway and the chat files are stored in |
+| `AUTO_RENAME` | Global auto-rename template |
+| `BOT_THEME` / `BUTTON_STYLE` | Chat theme and inline button accent |
+| `ARIA2_MAX_DL_SPEED` | Cap aria2's total speed, e.g. `80M`, to protect the VPS |
+
 > 🔐 Keep tokens, OAuth files, MongoDB URLs, rclone configs, Mega accounts, TeraBox cookies, and service-account JSONs out of public commits.
 
 ---
@@ -160,6 +266,9 @@ Send `/help` inside Telegram for the complete live command list.
 | `/usettings` | User-specific settings |
 | `/bsetting` | Owner configuration panel |
 | `/tbx` / `tbx` | Browse your TeraBox account (interactive web file selector) |
+| `/link` / `/stream` / `/f2l` | **ULTRA** — stream + download links for a file |
+| `/autorename` | **ULTRA** — set your auto-rename template |
+| `/tokengen` | **ULTRA** — generate your own Google Drive token |
 
 ### 🧩 Common Arguments
 
@@ -213,6 +322,10 @@ NEO-WZML is based on WZML-X and focuses on deployment reliability, modern select
 | Uploads | Telegram, Drive, TeraBox, rclone, and multi-DDL host uploads |
 | UX | Instant "Processing..." ack, save buttons, dump selection, filename formatting, ownership guards |
 | Deployment | Docker bridge networking with optional VPN routing scaffold |
+| **Transfers (ULTRA)** | Multi-bot parallel upload/download with guaranteed episode ordering |
+| **Encoding (ULTRA)** | Visual FFmpeg profile builder with live command preview |
+| **Streaming (ULTRA)** | FileToLink gateway with range requests, batch and auto-link |
+| **Renaming (ULTRA)** | Template-driven auto-rename with season/episode parsing |
 
 Removed from this fork: NZB/SABnzbd, YouTube upload, IMDB, and broadcast modules.
 

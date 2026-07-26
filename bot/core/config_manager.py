@@ -98,6 +98,7 @@ class Config:
     MIRROR_NAME_SWAP = ""
 
     LEECH_NAME_SWAP = ""
+    AUTO_RENAME = ""  # template, e.g. "{title} - S{season}E{episode} [{quality}]"
     OWNER_ID = 0
     QUEUE_ALL = 0
     QUEUE_DOWNLOAD = 0

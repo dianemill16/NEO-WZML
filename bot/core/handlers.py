@@ -340,6 +340,13 @@ def add_handlers():
     )
     TgClient.bot.add_handler(
         MessageHandler(
+            auto_rename,
+            filters=command(BotCommands.AutoRenameCommand, case_sensitive=True)
+            & (private | CustomFilters.authorized),
+        )
+    )
+    TgClient.bot.add_handler(
+        MessageHandler(
             ytdl,
             filters=command(BotCommands.YtdlCommand, case_sensitive=True)
             & CustomFilters.authorized,

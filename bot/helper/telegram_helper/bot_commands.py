@@ -46,6 +46,7 @@ class BotCommands:
         "SudoList": "sudolist",
         "BotSet": ["bsetting", "bs"],
         "UserSet": ["usetting", "us"],
+        "AutoRename": ["autorename", "arn"],
         "Select": ["select", "sel"],
         "SpeedTest": ["speedtest", "stest"],
         "Plugins": "plugins",

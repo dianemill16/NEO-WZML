@@ -106,6 +106,12 @@ class TelegramUploader:
         self._helper_index = None
         self._prep_lock = Lock()
         self._is_log_del = False
+        # BOT_PM delivery. With HyperUpload the files are posted by helper
+        # bots, so the main bot copies them to the user's PM only after the
+        # whole task is done — queued here in exact upload order.
+        self._pm_defer = False
+        self._pm_queue = []
+        self._pm_reply_to = None
 
     def _check_cancelled(self):
         if self._listener.is_cancelled:
@@ -420,6 +426,24 @@ class TelegramUploader:
             media=self._get_input_media(subkey, key),
             disable_notification=True,
         )
+        if self._pm_defer and self._pm_queue:
+            # the grouped parts are about to be deleted and reposted as one
+            # album — swap them in the PM queue at the same position so the
+            # PM copy keeps the upload order and doesn't hit dead message ids
+            old = {(m.chat.id, m.id) for m in msgs}
+            pos = next(
+                (i for i, e in enumerate(self._pm_queue) if e[:2] in old), None
+            )
+            self._pm_queue = [e for e in self._pm_queue if e[:2] not in old]
+            if pos is not None:
+                self._pm_queue[pos:pos] = [
+                    (
+                        m.chat.id,
+                        m.id,
+                        getattr(m.document or m.video, "file_name", "") or "",
+                    )
+                    for m in msgs_list
+                ]
         for msg in msgs:
             if msg.link in self._msgs_dict:
                 del self._msgs_dict[msg.link]
@@ -445,8 +469,33 @@ class TelegramUploader:
         if from_chat_id == chat_id:
             return
 
-        reply_to_message_id = self._listener.pm_msg.id if self._listener.pm_msg else None
-        file_name = ospath.basename(self._up_path) if self._up_path else ""
+        if self._pm_defer:
+            # HyperUpload: helper bots post the files, so copying them to
+            # PM one by one races with the parallel pipeline. Queue them and
+            # let _flush_pm_queue() copy the whole task in upload order once
+            # every file has landed.
+            self._pm_queue.append(
+                (
+                    from_chat_id,
+                    message_id,
+                    ospath.basename(self._up_path) if self._up_path else "",
+                )
+            )
+            return
+
+        await self._copy_one_to_pm(
+            from_chat_id,
+            message_id,
+            ospath.basename(self._up_path) if self._up_path else "",
+        )
+
+    async def _copy_one_to_pm(self, from_chat_id, message_id, file_name=""):
+        """Copy a single uploaded message to the user's PM (copy, not
+        forward, so no 'Forwarded from' tag). Returns True on success."""
+        chat_id = self._listener.user_id
+        if self._pm_reply_to is None and self._listener.pm_msg:
+            self._pm_reply_to = self._listener.pm_msg.id
+        reply_to_message_id = self._pm_reply_to
 
         last_err = None
         flood_waits = 0
@@ -455,7 +504,7 @@ class TelegramUploader:
         max_total_wait = 30 * 60
         for attempt in range(1, 7):
             if self._listener.is_cancelled:
-                return
+                return False
             try:
                 await TgClient.bot.copy_message(
                     chat_id=chat_id,
@@ -463,7 +512,7 @@ class TelegramUploader:
                     message_id=message_id,
                     reply_to_message_id=reply_to_message_id,
                 )
-                return
+                return True
             except (FloodWait, FloodPremiumWait) as f:
                 last_err = f
                 delay = f.value * 1.3
@@ -484,7 +533,10 @@ class TelegramUploader:
                         "BotPM copy failed with reply_to_message_id="
                         f"{reply_to_message_id}. Retrying without it: {e}"
                     )
+                    # remember it for the rest of the task so every queued
+                    # file doesn't waste an attempt on the same bad reply id
                     reply_to_message_id = None
+                    self._pm_reply_to = None
                     continue
 
                 if any(x in error_msg for x in [
@@ -521,6 +573,33 @@ class TelegramUploader:
                 f"{last_err} | user_id={chat_id} "
                 f"from_chat_id={from_chat_id} message_id={message_id} file={file_name}"
             )
+        return False
+
+    async def _flush_pm_queue(self):
+        """HyperUpload: copy every file posted during this task to the
+        user's PM, in the same order they were uploaded. copy_message is
+        used (not forward_messages), so the files arrive without any
+        'Forwarded from' tag."""
+        queue, self._pm_queue = self._pm_queue, []
+        if not queue or self._listener.is_cancelled:
+            return
+        LOGGER.info(
+            f"BotPM: sending {len(queue)} file(s) to {self._listener.user_id} "
+            "in upload order"
+        )
+        failed = 0
+        for from_chat_id, message_id, file_name in queue:
+            if self._listener.is_cancelled:
+                return
+            if not await self._copy_one_to_pm(from_chat_id, message_id, file_name):
+                failed += 1
+            await sleep(0.6)
+        if failed and not self._listener.is_cancelled:
+            await send_message(
+                self._listener.user_id,
+                f"Failed to send {failed} of {len(queue)} file(s) to your PM. "
+                "Make sure the bot is an admin in the leech dump chat. Check logs!",
+            )
 
     async def upload(self):
         await self._user_settings()
@@ -528,6 +607,10 @@ class TelegramUploader:
         if not res:
             return
         self._is_log_del = False
+        # With HyperUpload the files are posted by helper bots while several
+        # uploads run in parallel, so BOT_PM delivery is deferred to the end
+        # of the task and replayed in upload order (see _flush_pm_queue).
+        self._pm_defer = self._hyper_ul
         items = []
         for dirpath, _, files in natsorted(await sync_to_async(walk, self._path)):
             if dirpath.strip().endswith("/yt-dlp-thumb"):
@@ -557,6 +640,7 @@ class TelegramUploader:
                         LOGGER.info(
                             f"While sending media group at the end of task. Error: {e}"
                         )
+        await self._flush_pm_queue()
         if self._total_files == 0:
             await self._cleanup_auto_thumb()
             await self._listener.on_upload_error(

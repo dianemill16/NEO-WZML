@@ -230,3 +230,7 @@ FILETOLINK_CHAT = ""
 # Chat response theme: "ultra" (default, matches the ULTRA web UI),
 # "minimal" (previous look), "random", or any bot/helper/themes/neo_*.py
 BOT_THEME = "ultra"
+
+# Auto-generate FileToLink links when a file is sent straight to the
+# bot in PM (users can opt out individually in /usetting)
+FILETOLINK_AUTO = True

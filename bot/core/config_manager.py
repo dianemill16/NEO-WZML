@@ -80,6 +80,7 @@ class Config:
     LEECH_DUMP_CHAT = ""
     FILETOLINK_ENABLED = False
     FILETOLINK_CHAT = ""  # bin channel for /link; falls back to LEECH_DUMP_CHAT
+    FILETOLINK_AUTO = True  # auto-link files sent straight to the bot in PM
     LINKS_LOG_ID = ""
     MIRROR_LOG_ID = ""
     CLEAN_LOG_MSG = False

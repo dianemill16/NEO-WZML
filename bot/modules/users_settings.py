@@ -653,6 +653,13 @@ async def get_user_settings(from_user, stype="main"):
             f"userset {user_id} tog USER_TOKENS {'f' if user_tokens else 't'}",
         )
 
+        if Config.FILETOLINK_ENABLED and Config.FILETOLINK_AUTO:
+            auto_f2l = user_dict.get("AUTO_FILETOLINK", True)
+            buttons.data_button(
+                f"{'Disable' if auto_f2l else 'Enable'} Auto FileToLink",
+                f"userset {user_id} tog AUTO_FILETOLINK {'f' if auto_f2l else 't'}",
+            )
+
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
 
@@ -668,6 +675,7 @@ async def get_user_settings(from_user, stype="main"):
  • <b>Default Upload Package:</b> <b>{du}</b>
  • <b>Default Usage Mode:</b> <b>{tr}'s</b> token/config
  • <b>yt Cookies Mode:</b> <b>{cookie_mode}</b>
+ • <b>Auto FileToLink:</b> <b>{'Enabled' if user_dict.get('AUTO_FILETOLINK', True) else 'Disabled'}</b>
 """
 
     elif stype == "leech":

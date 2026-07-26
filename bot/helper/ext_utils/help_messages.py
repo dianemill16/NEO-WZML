@@ -1063,6 +1063,7 @@ def get_help_string(user_id=None, is_sudo=False):
 config_descriptions = {
     "BUTTON_STYLE": "Accent style for inline buttons (none/blue/red/green/purple/orange/yellow/diamond/star/arrow/bracket). Set via /bsetting > Button Style",
     "FILETOLINK_ENABLED": "Enable /link streaming gateway. Needs BASE_URL and FILETOLINK_CHAT (or LEECH_DUMP_CHAT)",
+    "FILETOLINK_AUTO": "Auto-generate links when a file is sent straight to the bot in PM. Users can opt out in /usetting",
     "FILETOLINK_CHAT": "Bin channel where /link stores files for streaming. Bot must be admin. Falls back to LEECH_DUMP_CHAT",
     "AUTO_RENAME": "Global auto-rename template, e.g. {title} - S{season}E{episode} [{quality}]. Per-user via /autorename",
     "BOT_TOKEN": "The Telegram Bot Token that you got from @BotFather",

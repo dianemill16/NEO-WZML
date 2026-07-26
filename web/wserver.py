@@ -753,6 +753,20 @@ async def _stream_response(message_id: int, sig: str, request: Request, as_attac
     )
 
 
+@app.get("/api/filetolink/status")
+async def filetolink_status():
+    from web.streamer import ByteStreamer, StreamClients
+
+    return JSONResponse(
+        {
+            "clients": len(StreamClients.loads()),
+            "loads": StreamClients.loads(),
+            "cached": len(ByteStreamer._props_cache),
+            "sessions": len(ByteStreamer._sessions),
+        }
+    )
+
+
 @app.head("/stream/{message_id}/{sig}")
 @app.get("/stream/{message_id}/{sig}")
 async def stream_media(message_id: int, sig: str, request: Request):

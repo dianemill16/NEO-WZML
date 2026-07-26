@@ -37,7 +37,7 @@ from .stats import bot_stats, stats_pages, get_packages_version
 from .status import task_status, status_pages
 from .users_settings import get_users_settings, edit_user_settings, send_user_settings
 from .autorename import auto_rename
-from .filetolink import file_to_link
+from .filetolink import file_to_link, auto_file_to_link
 from .encode_profiles import encode_profiles
 from .token_generator import token_generator
 from .ytdlp import ytdl, ytdl_leech
@@ -106,6 +106,7 @@ __all__ = [
     "send_user_settings",
     "auto_rename",
     "file_to_link",
+    "auto_file_to_link",
     "encode_profiles",
     "token_generator",
     "ytdl",

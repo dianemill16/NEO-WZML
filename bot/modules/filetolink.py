@@ -36,11 +36,11 @@ def _get_media(message):
 
 
 def _bin_chat():
-    chat = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
-    if not chat:
-        return None
-    chat = str(chat).split("|", 1)[0].strip()
-    return int(chat) if chat.lstrip("-").isdigit() else chat
+    # single source of truth shared with the web process — the link
+    # signature is bound to this exact value
+    from web.streamer import bin_chat
+
+    return bin_chat()
 
 
 @new_task
@@ -103,7 +103,17 @@ async def file_to_link(_, message):
     stream_url = f"{base_url}/stream/{path}"
     download_url = f"{base_url}/dl/{path}"
     watch_url = f"{base_url}/watch/{path}"
-    streamable = file_name.lower().endswith(_STREAMABLE)
+    # a directly-sent video/voice note often has no file_name, so fall
+    # back to the media type and mime before deciding it isn't playable
+    mime = (getattr(media, "mime_type", "") or "").lower()
+    streamable = (
+        file_name.lower().endswith(_STREAMABLE)
+        or mime.startswith(("video/", "audio/"))
+        or any(
+            getattr(stored, attr, None) is not None
+            for attr in ("video", "audio", "voice", "animation", "video_note")
+        )
+    )
 
     buttons = ButtonMaker()
     if streamable:

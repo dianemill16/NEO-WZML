@@ -7,6 +7,7 @@
 # processes derive from BOT_TOKEN, so URLs can't be forged.
 
 from asyncio import Lock, sleep
+from collections import OrderedDict
 from hashlib import sha256
 from hmac import compare_digest, new as hmac_new
 from math import ceil, floor
@@ -20,6 +21,11 @@ from pyrogram.session import Auth, Session
 from bot.core.config_manager import Config
 
 CHUNK_SIZE = 1024 * 1024
+PROPS_CACHE_MAX = 512
+
+
+class NoStreamClients(RuntimeError):
+    """No Telegram client could be started for streaming."""
 
 
 def _secret():
@@ -46,6 +52,18 @@ def make_path(chat_id, message_id):
     return f"{message_id}/{sign(chat_id, message_id)}"
 
 
+def bin_chat():
+    """The chat /link stores files in. Both processes MUST derive this
+    identically — the signature is bound to it, so any difference here
+    (a `chat|thread` suffix, stray whitespace, str vs int) makes every
+    generated link fail verification."""
+    chat = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
+    if not chat:
+        return None
+    chat = str(chat).split("|", 1)[0].strip()
+    return int(chat) if chat.lstrip("-").isdigit() else chat
+
+
 class StreamClients:
     """Lazily-started Telegram clients used only for streaming."""
 
@@ -56,6 +74,8 @@ class StreamClients:
 
     @classmethod
     async def start(cls):
+        if cls._started:  # lock-free fast path: every request hits this
+            return cls._clients
         async with cls._lock:
             if cls._started:
                 return cls._clients
@@ -91,6 +111,7 @@ class StreamClients:
     @classmethod
     async def stop(cls):
         async with cls._lock:
+            await ByteStreamer.close_all_sessions()
             for client in cls._clients:
                 try:
                     await client.stop()
@@ -102,10 +123,14 @@ class StreamClients:
 
     @classmethod
     def pick(cls):
-        """Least-loaded client, so concurrent viewers spread across bots."""
+        """Least-loaded client, so concurrent viewers spread across bots.
+        The load is booked here rather than when streaming begins — a
+        burst of concurrent requests would otherwise all read the same
+        stale counts and pile onto one bot. Callers must release()."""
         if not cls._clients:
-            raise RuntimeError("No stream clients available")
+            raise NoStreamClients("No stream clients available")
         index = min(cls._loads, key=cls._loads.get)
+        cls.acquire(index)
         return index, cls._clients[index]
 
     @classmethod
@@ -127,10 +152,15 @@ class ByteStreamer:
     def __init__(self, client, index):
         self.client = client
         self.index = index
-        self._sessions = {}
 
-    _props_cache = {}
-    _props_time = {}
+    # Media sessions are pooled across requests keyed by (client, DC):
+    # building one costs an Auth handshake plus up to 6 authorization
+    # round-trips on a foreign DC, and players issue many range requests
+    # per file — per-request sessions made every seek pay that cost.
+    _sessions = {}
+    _session_lock = Lock()
+
+    _props_cache = OrderedDict()
     _CACHE_TTL = 30 * 60
 
     @staticmethod
@@ -149,12 +179,20 @@ class ByteStreamer:
                 return media
         return None
 
-    async def get_properties(self, chat_id, message_id):
-        """(FileId, file_size, file_name, mime_type) with a short cache."""
+    @classmethod
+    def invalidate(cls, chat_id, message_id):
+        cls._props_cache.pop((chat_id, message_id), None)
+
+    async def get_properties(self, chat_id, message_id, refresh=False):
+        """(FileId, file_size, file_name, mime_type), LRU-cached."""
         key = (chat_id, message_id)
         now = time()
-        if key in self._props_cache and now - self._props_time.get(key, 0) < self._CACHE_TTL:
-            return self._props_cache[key]
+        if not refresh and (hit := self._props_cache.get(key)):
+            props, stamp = hit
+            if now - stamp < self._CACHE_TTL:
+                self._props_cache.move_to_end(key)
+                return props
+            del self._props_cache[key]
 
         message = await self.client.get_messages(chat_id, message_id)
         if not message or message.empty:
@@ -169,15 +207,24 @@ class ByteStreamer:
             getattr(media, "file_name", "") or f"{message_id}.bin",
             getattr(media, "mime_type", "") or "application/octet-stream",
         )
-        self._props_cache[key] = props
-        self._props_time[key] = now
+        self._props_cache[key] = (props, now)
+        self._props_cache.move_to_end(key)
+        while len(self._props_cache) > PROPS_CACHE_MAX:
+            self._props_cache.popitem(last=False)
         return props
 
     async def _media_session(self, file_id):
         dc_id = file_id.dc_id
-        if dc_id in self._sessions:
-            return self._sessions[dc_id]
+        key = (self.index, dc_id)
+        if (session := self._sessions.get(key)) is not None:
+            return session
 
+        async with self._session_lock:
+            if (session := self._sessions.get(key)) is not None:
+                return session
+            return await self._build_session(key, dc_id)
+
+    async def _build_session(self, key, dc_id):
         client = self.client
         if dc_id != await client.storage.dc_id():
             session = Session(
@@ -214,7 +261,7 @@ class ByteStreamer:
             )
             await session.start()
 
-        self._sessions[dc_id] = session
+        self._sessions[key] = session
         return session
 
     @staticmethod
@@ -300,13 +347,15 @@ class ByteStreamer:
             current_part += 1
             offset += CHUNK_SIZE
 
-    async def close(self):
-        for session in self._sessions.values():
+    @classmethod
+    async def close_all_sessions(cls):
+        """Only on shutdown — sessions are intentionally long-lived."""
+        for session in list(cls._sessions.values()):
             try:
                 await session.stop()
             except Exception:
                 pass
-        self._sessions.clear()
+        cls._sessions.clear()
 
 
 def range_params(start, end, file_size):

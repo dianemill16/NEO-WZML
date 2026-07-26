@@ -29,7 +29,10 @@ def _decorate(key):
         return key
     # don't decorate labels that already start with an emoji/symbol accent
     text = str(key)
-    if text[:1] in "🔵🔴🟢🟣🟠🟡🔹✦➤『" or text.startswith(prefix):
+    # many theme labels already lead with their own emoji (☁️ Cloud,
+    # 📨 Save, ⚡ Index…) — stacking a second accent on those looks broken
+    first = text[:1]
+    if not first or (not first.isalnum() and first not in "([<#/"):
         return text
     return f"{prefix}{text}{suffix}"
 

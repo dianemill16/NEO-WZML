@@ -13,7 +13,7 @@ from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getL
 from aioaria2 import Aria2HttpClient
 from aiohttp.client_exceptions import ClientError
 from aioqbt.client import create_client
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from aioqbt.exc import AQError
@@ -88,9 +88,11 @@ async def lifespan(app: FastAPI):
     await qbittorrent.close()
     if proxy_session is not None:
         await proxy_session.close()
+    from web.mongo import close as close_mongo
     from web.streamer import StreamClients
 
     await StreamClients.stop()
+    close_mongo()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -533,42 +535,26 @@ def _encode_auth(user: str, token: str):
     return int(user)
 
 
-async def _profiles_db():
-    """Mongo handle for the web process (bot's `database` lives in the
-    bot process, so open our own short-lived client)."""
-    if not Config.DATABASE_URL:
-        return None, None
-    from motor.motor_asyncio import AsyncIOMotorClient
-
-    client = AsyncIOMotorClient(Config.DATABASE_URL)
-    bot_id = (Config.BOT_TOKEN or ":").split(":", 1)[0]
-    return client, client.neowzml.users[bot_id] if bot_id else None
-
-
 async def _load_profiles(user_id):
-    client, coll = await _profiles_db()
+    from web.mongo import users_collection
+
+    coll = users_collection()
     if coll is None:
         return dict(Config.FFMPEG_CMDS or {})
-    try:
-        doc = await coll.find_one({"_id": user_id}, {"FFMPEG_CMDS": 1}) or {}
-        return doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {})
-    finally:
-        if client is not None:
-            client.close()
+    doc = await coll.find_one({"_id": user_id}, {"FFMPEG_CMDS": 1}) or {}
+    return doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {})
 
 
 async def _save_profiles(user_id, profiles):
-    client, coll = await _profiles_db()
+    from web.mongo import users_collection
+
+    coll = users_collection()
     if coll is None:
         return False
-    try:
-        await coll.update_one(
-            {"_id": user_id}, {"$set": {"FFMPEG_CMDS": profiles}}, upsert=True
-        )
-        return True
-    finally:
-        if client is not None:
-            client.close()
+    await coll.update_one(
+        {"_id": user_id}, {"$set": {"FFMPEG_CMDS": profiles}}, upsert=True
+    )
+    return True
 
 
 @app.get("/app/encode-profiles", response_class=HTMLResponse)
@@ -649,22 +635,27 @@ async def _stream_response(message_id: int, sig: str, request: Request, as_attac
 
     from web.streamer import (
         ByteStreamer,
-        CHUNK_SIZE,
+        NoStreamClients,
         StreamClients,
+        bin_chat,
         range_params,
         verify,
     )
 
-    chat_id = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
+    chat_id = bin_chat()
     if not chat_id:
         raise HTTPException(status_code=503, detail="FileToLink is not configured")
-    chat_id = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
 
     if not verify(chat_id, message_id, sig):
         raise HTTPException(status_code=403, detail="Invalid or expired link")
 
     await StreamClients.start()
-    index, client = StreamClients.pick()
+    try:
+        index, client = StreamClients.pick()
+    except NoStreamClients:
+        raise HTTPException(
+            status_code=503, detail="No streaming client available — check bot tokens"
+        )
     streamer = ByteStreamer(client, index)
 
     try:
@@ -672,12 +663,15 @@ async def _stream_response(message_id: int, sig: str, request: Request, as_attac
             chat_id, message_id
         )
     except FileNotFoundError as e:
+        StreamClients.release(index)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        StreamClients.release(index)
         LOGGER.error(f"FileToLink properties error: {e}")
         raise HTTPException(status_code=502, detail="Unable to read file")
 
     if not file_size:
+        StreamClients.release(index)
         raise HTTPException(status_code=404, detail="Empty file")
 
     range_header = request.headers.get("Range")
@@ -685,13 +679,25 @@ async def _stream_response(message_id: int, sig: str, request: Request, as_attac
     partial = False
     if range_header:
         try:
-            raw_range = range_header.replace("bytes=", "").split("-")
-            start = int(raw_range[0]) if raw_range[0] else 0
-            end = int(raw_range[1]) if len(raw_range) > 1 and raw_range[1] else end
+            raw_range = range_header.replace("bytes=", "").strip().split("-", 1)
+            first, last = raw_range[0].strip(), (
+                raw_range[1].strip() if len(raw_range) > 1 else ""
+            )
+            if not first:
+                # suffix form "bytes=-N" — the LAST n bytes, not the whole file
+                if not last:
+                    raise ValueError("empty range")
+                start = max(0, file_size - int(last))
+                end = file_size - 1
+            else:
+                start = int(first)
+                end = int(last) if last else end
             partial = True
         except ValueError:
+            StreamClients.release(index)
             raise HTTPException(status_code=416, detail="Malformed Range header")
     if start < 0 or end >= file_size or start > end:
+        StreamClients.release(index)
         return JSONResponse(
             {"error": "Requested range not satisfiable"},
             status_code=416,
@@ -711,18 +717,33 @@ async def _stream_response(message_id: int, sig: str, request: Request, as_attac
     if partial:
         headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
 
+    # StreamingResponse always drains its iterator, so a HEAD would pull
+    # the whole file from Telegram just to discard it — answer with
+    # headers only.
+    if request.method == "HEAD":
+        StreamClients.release(index)
+        return Response(
+            status_code=206 if partial else 200,
+            headers=headers,
+            media_type=mime_type,
+        )
+
     async def body():
-        StreamClients.acquire(index)
         try:
             async for chunk in streamer.yield_file(
                 file_id, offset, first_cut, last_cut, part_count
             ):
                 yield chunk
         except Exception as e:
-            LOGGER.error(f"FileToLink stream aborted: {e}")
+            # headers already promised Content-Length; log loudly so a
+            # truncated transfer isn't mistaken for a clean one
+            LOGGER.error(
+                f"FileToLink stream aborted for {message_id} "
+                f"(bytes {start}-{end}): {e}"
+            )
+            streamer.invalidate(chat_id, message_id)
         finally:
             StreamClients.release(index)
-            await streamer.close()
 
     return StreamingResponse(
         body(),
@@ -746,17 +767,25 @@ async def download_media(message_id: int, sig: str, request: Request):
 
 @app.get("/watch/{message_id}/{sig}", response_class=HTMLResponse)
 async def watch_media(message_id: int, sig: str, request: Request):
-    from web.streamer import ByteStreamer, StreamClients, verify
+    from web.streamer import (
+        ByteStreamer,
+        NoStreamClients,
+        StreamClients,
+        bin_chat,
+        verify,
+    )
 
-    chat_id = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
+    chat_id = bin_chat()
     if not chat_id:
         raise HTTPException(status_code=503, detail="FileToLink is not configured")
-    chat_id = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
     if not verify(chat_id, message_id, sig):
         raise HTTPException(status_code=403, detail="Invalid or expired link")
 
     await StreamClients.start()
-    index, client = StreamClients.pick()
+    try:
+        index, client = StreamClients.pick()
+    except NoStreamClients:
+        raise HTTPException(status_code=503, detail="No streaming client available")
     streamer = ByteStreamer(client, index)
     try:
         _, file_size, file_name, mime_type = await streamer.get_properties(
@@ -764,6 +793,8 @@ async def watch_media(message_id: int, sig: str, request: Request):
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        StreamClients.release(index)
 
     return templates.TemplateResponse(
         request,

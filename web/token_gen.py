@@ -69,17 +69,12 @@ async def store_token(user_id, token_bytes):
     with open(path, "wb") as f:
         f.write(token_bytes)
 
-    if not Config.DATABASE_URL:
+    from web.mongo import users_collection
+
+    coll = users_collection()
+    if coll is None:
         return path
-
-    from motor.motor_asyncio import AsyncIOMotorClient
-
-    bot_id = (Config.BOT_TOKEN or ":").split(":", 1)[0]
-    client = AsyncIOMotorClient(Config.DATABASE_URL)
-    try:
-        await client.neowzml.users[bot_id].update_one(
-            {"_id": user_id}, {"$set": {"TOKEN_PICKLE": token_bytes}}, upsert=True
-        )
-    finally:
-        client.close()
+    await coll.update_one(
+        {"_id": user_id}, {"$set": {"TOKEN_PICKLE": token_bytes}}, upsert=True
+    )
     return path

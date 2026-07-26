@@ -13,6 +13,9 @@ from bot.helper.telegram_helper.message_utils import send_message
 
 @new_task
 async def encode_profiles(_, message):
+    if message.from_user is None:
+        await send_message(message, "Run <code>/encode</code> from a user account.")
+        return
     user_id = message.from_user.id
     base_url = (Config.BASE_URL or "").rstrip("/")
     if not base_url:

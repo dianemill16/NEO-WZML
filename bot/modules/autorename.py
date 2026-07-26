@@ -26,6 +26,9 @@ _HELP = (
 
 @new_task
 async def auto_rename(_, message):
+    if message.from_user is None:
+        await send_message(message, "Run <code>/autorename</code> from a user account.")
+        return
     user_id = message.from_user.id
     text = message.text.split(maxsplit=1)
     arg = text[1].strip() if len(text) > 1 else ""

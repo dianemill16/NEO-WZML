@@ -42,7 +42,9 @@ _YEAR_PATTERN = re_compile(r"\b(19|20)\d{2}\b")
 
 # .part1.rar / .001 / .7z.002 — must be preserved so split parts stay
 # groupable and in sequence during upload
-_PART_SUFFIX = re_compile(r"(?:\.part\d+(?:\.\w+)?|\.\d{3,})$", IGNORECASE)
+_PART_SUFFIX = re_compile(
+    r"(?:\.part\d+(?:\.\w+)?|(?:\.\w{1,4})?\.\d{3,})$", IGNORECASE
+)
 
 
 def _pad(value, width=2):
@@ -166,8 +168,12 @@ def apply_autorename_template(filename, template):
         part_tag = ""
         if match := _PART_SUFFIX.search(filename):
             part_tag = match.group(0)
-            if part_tag.lower().endswith(ext.lower()) and ext:
+            if ext and part_tag.lower().endswith(ext.lower()) and len(part_tag) > len(ext):
                 part_tag = part_tag[: -len(ext)]
+            elif ext and part_tag.lower() == ext.lower():
+                # the whole suffix IS the extension (e.g. ".002"); keep it
+                # once, via ext, so it isn't emitted twice
+                part_tag = ""
         fields = extract_fields(filename)
 
         # remember which placeholders resolved to nothing so their
@@ -199,6 +205,7 @@ def apply_autorename_template(filename, template):
         # and empty brackets they left behind
         result = re_sub(r"\{[a-z_]+\}", "", result, flags=IGNORECASE)
         result = re_sub(r"[\[({]\s*[\])}]", "", result)
+        result = re_sub(r"\s+([\])}])", r"\1", result)
         # collapse separators orphaned between surviving parts
         result = re_sub(r"(?:\s*-\s*){2,}", " - ", result)
         result = re_sub(r"-\s*(?=[\[({])", "", result)

@@ -1,247 +1,358 @@
-<!DOCTYPE html>
+<!-- This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML) -->
+
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Encoding Profiles — NEO-WZML</title>
-  <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; padding: 24px 16px;
-      background: #0e1117; color: #e6edf3;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    }
-    .wrap { max-width: 880px; margin: 0 auto; }
-    h1 { font-size: 1.3rem; margin: 0 0 4px; }
-    .sub { color: #8b949e; font-size: .88rem; margin-bottom: 22px; }
-    .card {
-      background: #161b22; border: 1px solid #30363d;
-      border-radius: 14px; padding: 20px; margin-bottom: 18px;
-    }
-    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-    label { display: block; font-size: .78rem; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
-    input, select {
-      width: 100%; padding: 9px 11px; border-radius: 8px; font-size: .9rem;
-      background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
-    }
-    input:focus, select:focus { outline: none; border-color: #58a6ff; }
-    .row { display: flex; align-items: center; gap: 9px; margin-top: 4px; }
-    .row input[type=checkbox] { width: auto; }
-    .row label { margin: 0; text-transform: none; letter-spacing: 0; color: #e6edf3; font-size: .87rem; }
-    .range-val { color: #58a6ff; font-weight: 600; }
-    pre {
-      background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
-      padding: 13px; font-size: .8rem; color: #7ee787; overflow-x: auto;
-      white-space: pre-wrap; word-break: break-all; margin: 0;
-    }
-    button {
-      padding: 11px 20px; border-radius: 9px; font-size: .9rem; font-weight: 600;
-      border: 1px solid #2ea043; background: #238636; color: #fff; cursor: pointer;
-    }
-    button:hover { filter: brightness(1.12); }
-    button.ghost { background: #21262d; border-color: #30363d; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .msg { font-size: .86rem; margin-left: 2px; }
-    .ok { color: #7ee787; } .err { color: #ff7b72; }
-    .list { display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip {
-      background: #21262d; border: 1px solid #30363d; border-radius: 20px;
-      padding: 6px 13px; font-size: .82rem; display: flex; gap: 8px; align-items: center;
-    }
-    .chip span.x { color: #ff7b72; cursor: pointer; font-weight: 700; }
-    h2 { font-size: .95rem; margin: 0 0 12px; }
-    .hint { color: #8b949e; font-size: .8rem; margin-top: 10px; }
-  </style>
-</head>
-<body>
-<div class="wrap">
-  <h1>Encoding Profiles</h1>
-  <div class="sub">
-    Build an FFmpeg preset visually. Saved profiles are used with
-    <code>-ff &lt;name&gt;</code> on any leech/mirror task.
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Encoding Profiles — NEO-WZML ULTRA</title>
+    <link rel="icon" type="image/png" href="https://iili.io/FLRJNMG.th.png" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/static/ultra.css" />
+    <style>
+      .preview-wrap { position: relative; }
+      .preview-wrap .copy {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.75rem;
+      }
+      .use-hint {
+        margin-top: 0.85rem;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+      }
+      .use-hint code {
+        background: rgba(99, 102, 241, 0.12);
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        border-radius: 6px;
+        padding: 0.1rem 0.4rem;
+        color: #c7d2fe;
+        font-size: 0.78rem;
+      }
+      .section-split {
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: 1fr;
+      }
+      fieldset { border: 0; }
+      .fs-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-secondary);
+        margin: 1.35rem 0 0.75rem;
+      }
+      .fs-label:first-of-type { margin-top: 0; }
+      .toggles {
+        display: grid;
+        gap: 0.15rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+    </style>
+  </head>
+  <body>
+    <header class="u-header">
+      <div class="u-header-inner">
+        <a class="u-logo" href="/">
+          <span class="u-logo-mark">N</span>
+          <span class="u-logo-text">NEO-WZML</span>
+          <span class="u-tag">Ultra</span>
+        </a>
+        <span class="u-tag"><i class="fa-solid fa-sliders"></i> Encoder</span>
+      </div>
+    </header>
 
-  <div class="card">
-    <h2>Existing profiles</h2>
-    <div class="list" id="profiles"><span class="sub">Loading…</span></div>
-  </div>
+    <main class="u-wrap narrow">
+      <div class="u-page-head">
+        <h1 class="u-title">Encoding Profiles</h1>
+        <p class="u-sub">
+          Build an FFmpeg preset visually — no command line. Saved profiles run
+          on any task with <code>-ff &lt;name&gt;</code>.
+        </p>
+      </div>
 
-  <div class="card">
-    <h2>Build a profile</h2>
-    <div class="grid">
-      <div>
-        <label for="name">Profile name</label>
-        <input id="name" placeholder="e.g. hevc1080" />
-      </div>
-      <div>
-        <label for="source">Applies to</label>
-        <select id="source">
-          <option value="video">All videos</option>
-          <option value="audio">All audio</option>
-          <option value="mkv">MKV only</option>
-          <option value="mp4">MP4 only</option>
-        </select>
-      </div>
-      <div>
-        <label for="video_codec">Video codec</label>
-        <select id="video_codec">
-          <option value="x265">x265 / HEVC</option>
-          <option value="x264">x264 / AVC</option>
-          <option value="av1">AV1 (SVT)</option>
-          <option value="vp9">VP9</option>
-          <option value="copy">Copy (no re-encode)</option>
-        </select>
-      </div>
-      <div>
-        <label for="crf">Quality — CRF <span class="range-val" id="crfv">24</span></label>
-        <input type="range" id="crf" min="0" max="51" value="24" />
-      </div>
-      <div>
-        <label for="preset">Speed preset</label>
-        <select id="preset">
-          <option>ultrafast</option><option>superfast</option><option>veryfast</option>
-          <option>faster</option><option>fast</option><option selected>medium</option>
-          <option>slow</option><option>slower</option><option>veryslow</option>
-        </select>
-      </div>
-      <div>
-        <label for="resolution">Resolution</label>
-        <select id="resolution">
-          <option value="source">Keep source</option>
-          <option value="2160">2160p</option><option value="1440">1440p</option>
-          <option value="1080">1080p</option><option value="720">720p</option>
-          <option value="480">480p</option><option value="360">360p</option>
-        </select>
-      </div>
-      <div>
-        <label for="pixel_format">Pixel format</label>
-        <select id="pixel_format">
-          <option value="">Auto</option>
-          <option value="yuv420p">yuv420p (8-bit)</option>
-          <option value="yuv420p10le">yuv420p10le (10-bit)</option>
-        </select>
-      </div>
-      <div>
-        <label for="audio_codec">Audio codec</label>
-        <select id="audio_codec">
-          <option value="copy">Copy</option><option value="aac">AAC</option>
-          <option value="opus">Opus</option><option value="mp3">MP3</option>
-          <option value="ac3">AC3</option>
-        </select>
-      </div>
-      <div>
-        <label for="audio_bitrate">Audio bitrate (kbps)</label>
-        <input id="audio_bitrate" type="number" min="32" max="512" value="128" />
-      </div>
-      <div>
-        <label for="container">Container</label>
-        <select id="container">
-          <option value="mkv">MKV</option><option value="mp4">MP4</option>
-          <option value="webm">WebM</option>
-        </select>
-      </div>
-      <div>
-        <label for="metadata_title">Metadata title</label>
-        <input id="metadata_title" placeholder="optional" />
-      </div>
-      <div>
-        <label for="extra_args">Extra ffmpeg flags</label>
-        <input id="extra_args" placeholder="e.g. -threads 4" />
-      </div>
-    </div>
+      <section class="u-card">
+        <h2>Your profiles</h2>
+        <div class="u-chips" id="profiles">
+          <span class="u-empty">Loading…</span>
+        </div>
+      </section>
 
-    <div class="row"><input type="checkbox" id="keep_all_streams" checked /><label for="keep_all_streams">Keep all streams (audio/subtitle tracks)</label></div>
-    <div class="row"><input type="checkbox" id="keep_subs" checked /><label for="keep_subs">Keep subtitles</label></div>
-    <div class="row"><input type="checkbox" id="delete_original" /><label for="delete_original">Delete original after encoding (-del)</label></div>
+      <section class="u-card">
+        <h2>Build a profile</h2>
 
-    <div class="hint">Generated command</div>
-    <pre id="preview">—</pre>
+        <div class="fs-label">Identity</div>
+        <div class="u-grid">
+          <div>
+            <label for="name">Profile name</label>
+            <input id="name" placeholder="e.g. hevc1080" autocomplete="off" />
+          </div>
+          <div>
+            <label for="source">Applies to</label>
+            <select id="source">
+              <option value="video">All videos</option>
+              <option value="audio">All audio</option>
+              <option value="mkv">MKV only</option>
+              <option value="mp4">MP4 only</option>
+            </select>
+          </div>
+          <div>
+            <label for="container">Output container</label>
+            <select id="container">
+              <option value="mkv">MKV</option>
+              <option value="mp4">MP4</option>
+              <option value="webm">WebM</option>
+            </select>
+          </div>
+        </div>
 
-    <div class="actions" style="margin-top:16px">
-      <button id="save">Save profile</button>
-      <button class="ghost" id="refresh">Reload</button>
-      <span class="msg" id="msg"></span>
-    </div>
-  </div>
-</div>
+        <div class="fs-label">Video</div>
+        <div class="u-grid">
+          <div>
+            <label for="video_codec">Codec</label>
+            <select id="video_codec">
+              <option value="x265">x265 / HEVC</option>
+              <option value="x264">x264 / AVC</option>
+              <option value="av1">AV1 (SVT)</option>
+              <option value="vp9">VP9</option>
+              <option value="copy">Copy — no re-encode</option>
+            </select>
+          </div>
+          <div>
+            <label for="crf">Quality · CRF <span class="u-val" id="crfv">24</span></label>
+            <input type="range" id="crf" min="0" max="51" value="24" />
+          </div>
+          <div>
+            <label for="preset">Speed preset</label>
+            <select id="preset">
+              <option>ultrafast</option><option>superfast</option>
+              <option>veryfast</option><option>faster</option>
+              <option>fast</option><option selected>medium</option>
+              <option>slow</option><option>slower</option><option>veryslow</option>
+            </select>
+          </div>
+          <div>
+            <label for="resolution">Resolution</label>
+            <select id="resolution">
+              <option value="source">Keep source</option>
+              <option value="2160">2160p · 4K</option>
+              <option value="1440">1440p</option>
+              <option value="1080">1080p</option>
+              <option value="720">720p</option>
+              <option value="480">480p</option>
+              <option value="360">360p</option>
+            </select>
+          </div>
+          <div>
+            <label for="pixel_format">Pixel format</label>
+            <select id="pixel_format">
+              <option value="">Auto</option>
+              <option value="yuv420p">yuv420p · 8-bit</option>
+              <option value="yuv420p10le">yuv420p10le · 10-bit</option>
+            </select>
+          </div>
+        </div>
 
-<script>
-const qs = new URLSearchParams(location.search);
-const AUTH = `user=${encodeURIComponent(qs.get('user')||'')}&token=${encodeURIComponent(qs.get('token')||'')}`;
-const ids = ['name','source','video_codec','crf','preset','resolution','pixel_format',
-             'audio_codec','audio_bitrate','container','metadata_title','extra_args',
-             'keep_all_streams','keep_subs','delete_original'];
+        <div class="fs-label">Audio &amp; metadata</div>
+        <div class="u-grid">
+          <div>
+            <label for="audio_codec">Audio codec</label>
+            <select id="audio_codec">
+              <option value="copy">Copy</option><option value="aac">AAC</option>
+              <option value="opus">Opus</option><option value="mp3">MP3</option>
+              <option value="ac3">AC3</option>
+            </select>
+          </div>
+          <div>
+            <label for="audio_bitrate">Bitrate (kbps)</label>
+            <input id="audio_bitrate" type="number" min="32" max="512" value="128" />
+          </div>
+          <div>
+            <label for="metadata_title">Metadata title</label>
+            <input id="metadata_title" placeholder="optional" autocomplete="off" />
+          </div>
+          <div>
+            <label for="extra_args">Extra ffmpeg flags</label>
+            <input id="extra_args" placeholder="e.g. -threads 4" autocomplete="off" />
+          </div>
+        </div>
 
-function collect() {
-  const p = {};
-  for (const id of ids) {
-    const el = document.getElementById(id);
-    p[id] = el.type === 'checkbox' ? el.checked : el.value;
-  }
-  return p;
-}
+        <div class="fs-label">Options</div>
+        <div class="toggles">
+          <div class="u-check">
+            <input type="checkbox" id="keep_all_streams" checked />
+            <label for="keep_all_streams">Keep all audio / subtitle tracks</label>
+          </div>
+          <div class="u-check">
+            <input type="checkbox" id="keep_subs" checked />
+            <label for="keep_subs">Keep subtitles</label>
+          </div>
+          <div class="u-check">
+            <input type="checkbox" id="delete_original" />
+            <label for="delete_original">Delete original after encode</label>
+          </div>
+        </div>
 
-function setMsg(text, ok) {
-  const m = document.getElementById('msg');
-  m.textContent = text;
-  m.className = 'msg ' + (ok ? 'ok' : 'err');
-}
+        <div class="u-hint">Generated command</div>
+        <div class="preview-wrap">
+          <div class="u-pre" id="preview">—</div>
+          <button class="u-btn ghost copy" id="copyCmd" type="button">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+        </div>
 
-let timer = null;
-async function preview() {
-  document.getElementById('crfv').textContent = document.getElementById('crf').value;
-  clearTimeout(timer);
-  timer = setTimeout(async () => {
-    try {
-      const r = await fetch(`/api/encode/preview?${AUTH}`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(collect())
-      });
-      const j = await r.json();
-      document.getElementById('preview').textContent = j.command || j.error || '—';
-    } catch (e) { document.getElementById('preview').textContent = 'preview failed'; }
-  }, 150);
-}
+        <div class="u-actions" style="margin-top: 1.15rem">
+          <button class="u-btn" id="save" type="button">
+            <i class="fa-solid fa-floppy-disk"></i> Save profile
+          </button>
+          <button class="u-btn ghost" id="refresh" type="button">
+            <i class="fa-solid fa-rotate"></i> Reload
+          </button>
+          <span class="u-msg" id="msg"></span>
+        </div>
+        <div class="use-hint" id="useHint"></div>
+      </section>
+    </main>
 
-async function loadProfiles() {
-  const box = document.getElementById('profiles');
-  try {
-    const r = await fetch(`/api/encode/profiles?${AUTH}`);
-    const j = await r.json();
-    const names = Object.keys(j.profiles || {});
-    if (!names.length) { box.innerHTML = '<span class="sub">No profiles yet.</span>'; return; }
-    box.innerHTML = '';
-    for (const n of names) {
-      const chip = document.createElement('div');
-      chip.className = 'chip';
-      chip.innerHTML = `<b>${n}</b><span class="x" title="delete">×</span>`;
-      chip.querySelector('.x').onclick = async () => {
-        if (!confirm(`Delete profile "${n}"?`)) return;
-        const d = await fetch(`/api/encode/profiles/${encodeURIComponent(n)}?${AUTH}`, {method:'DELETE'});
-        const dj = await d.json();
-        setMsg(dj.ok ? `Deleted ${n}` : (dj.error || 'delete failed'), dj.ok);
-        loadProfiles();
+    <footer class="u-foot">
+      <a href="/">NEO-WZML ULTRA</a> · this link is personal — don't share it
+    </footer>
+
+    <script>
+      const qs = new URLSearchParams(location.search);
+      const AUTH =
+        "user=" + encodeURIComponent(qs.get("user") || "") +
+        "&token=" + encodeURIComponent(qs.get("token") || "");
+      const ids = ["name","source","video_codec","crf","preset","resolution",
+        "pixel_format","audio_codec","audio_bitrate","container",
+        "metadata_title","extra_args","keep_all_streams","keep_subs",
+        "delete_original"];
+
+      function collect() {
+        const p = {};
+        for (const id of ids) {
+          const el = document.getElementById(id);
+          p[id] = el.type === "checkbox" ? el.checked : el.value;
+        }
+        return p;
+      }
+      function setMsg(text, ok) {
+        const m = document.getElementById("msg");
+        m.textContent = text;
+        m.className = "u-msg " + (ok ? "ok" : "err");
+      }
+
+      let timer = null;
+      async function preview() {
+        document.getElementById("crfv").textContent =
+          document.getElementById("crf").value;
+        const isCopy = document.getElementById("video_codec").value === "copy";
+        for (const id of ["crf", "preset", "resolution", "pixel_format"])
+          document.getElementById(id).disabled = isCopy;
+        document.getElementById("audio_bitrate").disabled =
+          document.getElementById("audio_codec").value === "copy";
+
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          try {
+            const r = await fetch("/api/encode/preview?" + AUTH, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(collect()),
+            });
+            const j = await r.json();
+            document.getElementById("preview").textContent =
+              j.command || j.error || "—";
+          } catch (e) {
+            document.getElementById("preview").textContent = "preview failed";
+          }
+        }, 150);
+      }
+
+      async function loadProfiles() {
+        const box = document.getElementById("profiles");
+        try {
+          const r = await fetch("/api/encode/profiles?" + AUTH);
+          const j = await r.json();
+          const names = Object.keys(j.profiles || {});
+          if (!names.length) {
+            box.innerHTML =
+              '<span class="u-empty">No profiles yet — build one below.</span>';
+            return;
+          }
+          box.innerHTML = "";
+          for (const n of names) {
+            const chip = document.createElement("div");
+            chip.className = "u-chip";
+            chip.title = (j.profiles[n] || []).join("\n");
+            const label = document.createElement("b");
+            label.textContent = n;
+            const x = document.createElement("span");
+            x.className = "x";
+            x.textContent = "×";
+            x.title = "delete";
+            x.onclick = async () => {
+              if (!confirm('Delete profile "' + n + '"?')) return;
+              const d = await fetch(
+                "/api/encode/profiles/" + encodeURIComponent(n) + "?" + AUTH,
+                { method: "DELETE" }
+              );
+              const dj = await d.json();
+              setMsg(dj.ok ? "Deleted " + n : dj.error || "delete failed", dj.ok);
+              loadProfiles();
+            };
+            chip.append(label, x);
+            box.appendChild(chip);
+          }
+        } catch (e) {
+          box.innerHTML = '<span class="u-msg err">Failed to load.</span>';
+        }
+      }
+
+      document.getElementById("save").onclick = async () => {
+        const r = await fetch("/api/encode/profiles?" + AUTH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(collect()),
+        });
+        const j = await r.json();
+        setMsg(j.ok ? "Saved" : j.error || "save failed", j.ok);
+        document.getElementById("useHint").innerHTML = j.ok
+          ? "Use it on a task: <code>/leech &lt;link&gt; -ff " + j.name + "</code>"
+          : "";
+        if (j.ok) loadProfiles();
       };
-      chip.title = (j.profiles[n] || []).join('\n');
-      box.appendChild(chip);
-    }
-  } catch (e) { box.innerHTML = '<span class="sub err">Failed to load.</span>'; }
-}
+      document.getElementById("refresh").onclick = loadProfiles;
+      document.getElementById("copyCmd").onclick = async () => {
+        const btn = document.getElementById("copyCmd");
+        try {
+          await navigator.clipboard.writeText(
+            document.getElementById("preview").textContent
+          );
+          btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        } catch (e) {
+          btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        }
+        setTimeout(() => {
+          btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+        }, 1600);
+      };
+      for (const id of ids)
+        document.getElementById(id).addEventListener("input", preview);
 
-document.getElementById('save').onclick = async () => {
-  const r = await fetch(`/api/encode/profiles?${AUTH}`, {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(collect())
-  });
-  const j = await r.json();
-  setMsg(j.ok ? `Saved "${j.name}" — use -ff ${j.name}` : (j.error || 'save failed'), j.ok);
-  if (j.ok) loadProfiles();
-};
-document.getElementById('refresh').onclick = loadProfiles;
-for (const id of ids) document.getElementById(id).addEventListener('input', preview);
-
-preview(); loadProfiles();
-</script>
-</body>
+      preview();
+      loadProfiles();
+    </script>
+  </body>
 </html>

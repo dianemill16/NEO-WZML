@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Encoding Profiles — NEO-WZML</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; padding: 24px 16px;
+      background: #0e1117; color: #e6edf3;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; margin: 0 0 4px; }
+    .sub { color: #8b949e; font-size: .88rem; margin-bottom: 22px; }
+    .card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 14px; padding: 20px; margin-bottom: 18px;
+    }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    label { display: block; font-size: .78rem; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    input, select {
+      width: 100%; padding: 9px 11px; border-radius: 8px; font-size: .9rem;
+      background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+    }
+    input:focus, select:focus { outline: none; border-color: #58a6ff; }
+    .row { display: flex; align-items: center; gap: 9px; margin-top: 4px; }
+    .row input[type=checkbox] { width: auto; }
+    .row label { margin: 0; text-transform: none; letter-spacing: 0; color: #e6edf3; font-size: .87rem; }
+    .range-val { color: #58a6ff; font-weight: 600; }
+    pre {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+      padding: 13px; font-size: .8rem; color: #7ee787; overflow-x: auto;
+      white-space: pre-wrap; word-break: break-all; margin: 0;
+    }
+    button {
+      padding: 11px 20px; border-radius: 9px; font-size: .9rem; font-weight: 600;
+      border: 1px solid #2ea043; background: #238636; color: #fff; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.12); }
+    button.ghost { background: #21262d; border-color: #30363d; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .msg { font-size: .86rem; margin-left: 2px; }
+    .ok { color: #7ee787; } .err { color: #ff7b72; }
+    .list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      background: #21262d; border: 1px solid #30363d; border-radius: 20px;
+      padding: 6px 13px; font-size: .82rem; display: flex; gap: 8px; align-items: center;
+    }
+    .chip span.x { color: #ff7b72; cursor: pointer; font-weight: 700; }
+    h2 { font-size: .95rem; margin: 0 0 12px; }
+    .hint { color: #8b949e; font-size: .8rem; margin-top: 10px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Encoding Profiles</h1>
+  <div class="sub">
+    Build an FFmpeg preset visually. Saved profiles are used with
+    <code>-ff &lt;name&gt;</code> on any leech/mirror task.
+  </div>
+
+  <div class="card">
+    <h2>Existing profiles</h2>
+    <div class="list" id="profiles"><span class="sub">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Build a profile</h2>
+    <div class="grid">
+      <div>
+        <label for="name">Profile name</label>
+        <input id="name" placeholder="e.g. hevc1080" />
+      </div>
+      <div>
+        <label for="source">Applies to</label>
+        <select id="source">
+          <option value="video">All videos</option>
+          <option value="audio">All audio</option>
+          <option value="mkv">MKV only</option>
+          <option value="mp4">MP4 only</option>
+        </select>
+      </div>
+      <div>
+        <label for="video_codec">Video codec</label>
+        <select id="video_codec">
+          <option value="x265">x265 / HEVC</option>
+          <option value="x264">x264 / AVC</option>
+          <option value="av1">AV1 (SVT)</option>
+          <option value="vp9">VP9</option>
+          <option value="copy">Copy (no re-encode)</option>
+        </select>
+      </div>
+      <div>
+        <label for="crf">Quality — CRF <span class="range-val" id="crfv">24</span></label>
+        <input type="range" id="crf" min="0" max="51" value="24" />
+      </div>
+      <div>
+        <label for="preset">Speed preset</label>
+        <select id="preset">
+          <option>ultrafast</option><option>superfast</option><option>veryfast</option>
+          <option>faster</option><option>fast</option><option selected>medium</option>
+          <option>slow</option><option>slower</option><option>veryslow</option>
+        </select>
+      </div>
+      <div>
+        <label for="resolution">Resolution</label>
+        <select id="resolution">
+          <option value="source">Keep source</option>
+          <option value="2160">2160p</option><option value="1440">1440p</option>
+          <option value="1080">1080p</option><option value="720">720p</option>
+          <option value="480">480p</option><option value="360">360p</option>
+        </select>
+      </div>
+      <div>
+        <label for="pixel_format">Pixel format</label>
+        <select id="pixel_format">
+          <option value="">Auto</option>
+          <option value="yuv420p">yuv420p (8-bit)</option>
+          <option value="yuv420p10le">yuv420p10le (10-bit)</option>
+        </select>
+      </div>
+      <div>
+        <label for="audio_codec">Audio codec</label>
+        <select id="audio_codec">
+          <option value="copy">Copy</option><option value="aac">AAC</option>
+          <option value="opus">Opus</option><option value="mp3">MP3</option>
+          <option value="ac3">AC3</option>
+        </select>
+      </div>
+      <div>
+        <label for="audio_bitrate">Audio bitrate (kbps)</label>
+        <input id="audio_bitrate" type="number" min="32" max="512" value="128" />
+      </div>
+      <div>
+        <label for="container">Container</label>
+        <select id="container">
+          <option value="mkv">MKV</option><option value="mp4">MP4</option>
+          <option value="webm">WebM</option>
+        </select>
+      </div>
+      <div>
+        <label for="metadata_title">Metadata title</label>
+        <input id="metadata_title" placeholder="optional" />
+      </div>
+      <div>
+        <label for="extra_args">Extra ffmpeg flags</label>
+        <input id="extra_args" placeholder="e.g. -threads 4" />
+      </div>
+    </div>
+
+    <div class="row"><input type="checkbox" id="keep_all_streams" checked /><label for="keep_all_streams">Keep all streams (audio/subtitle tracks)</label></div>
+    <div class="row"><input type="checkbox" id="keep_subs" checked /><label for="keep_subs">Keep subtitles</label></div>
+    <div class="row"><input type="checkbox" id="delete_original" /><label for="delete_original">Delete original after encoding (-del)</label></div>
+
+    <div class="hint">Generated command</div>
+    <pre id="preview">—</pre>
+
+    <div class="actions" style="margin-top:16px">
+      <button id="save">Save profile</button>
+      <button class="ghost" id="refresh">Reload</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const qs = new URLSearchParams(location.search);
+const AUTH = `user=${encodeURIComponent(qs.get('user')||'')}&token=${encodeURIComponent(qs.get('token')||'')}`;
+const ids = ['name','source','video_codec','crf','preset','resolution','pixel_format',
+             'audio_codec','audio_bitrate','container','metadata_title','extra_args',
+             'keep_all_streams','keep_subs','delete_original'];
+
+function collect() {
+  const p = {};
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    p[id] = el.type === 'checkbox' ? el.checked : el.value;
+  }
+  return p;
+}
+
+function setMsg(text, ok) {
+  const m = document.getElementById('msg');
+  m.textContent = text;
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+let timer = null;
+async function preview() {
+  document.getElementById('crfv').textContent = document.getElementById('crf').value;
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    try {
+      const r = await fetch(`/api/encode/preview?${AUTH}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(collect())
+      });
+      const j = await r.json();
+      document.getElementById('preview').textContent = j.command || j.error || '—';
+    } catch (e) { document.getElementById('preview').textContent = 'preview failed'; }
+  }, 150);
+}
+
+async function loadProfiles() {
+  const box = document.getElementById('profiles');
+  try {
+    const r = await fetch(`/api/encode/profiles?${AUTH}`);
+    const j = await r.json();
+    const names = Object.keys(j.profiles || {});
+    if (!names.length) { box.innerHTML = '<span class="sub">No profiles yet.</span>'; return; }
+    box.innerHTML = '';
+    for (const n of names) {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<b>${n}</b><span class="x" title="delete">×</span>`;
+      chip.querySelector('.x').onclick = async () => {
+        if (!confirm(`Delete profile "${n}"?`)) return;
+        const d = await fetch(`/api/encode/profiles/${encodeURIComponent(n)}?${AUTH}`, {method:'DELETE'});
+        const dj = await d.json();
+        setMsg(dj.ok ? `Deleted ${n}` : (dj.error || 'delete failed'), dj.ok);
+        loadProfiles();
+      };
+      chip.title = (j.profiles[n] || []).join('\n');
+      box.appendChild(chip);
+    }
+  } catch (e) { box.innerHTML = '<span class="sub err">Failed to load.</span>'; }
+}
+
+document.getElementById('save').onclick = async () => {
+  const r = await fetch(`/api/encode/profiles?${AUTH}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(collect())
+  });
+  const j = await r.json();
+  setMsg(j.ok ? `Saved "${j.name}" — use -ff ${j.name}` : (j.error || 'save failed'), j.ok);
+  if (j.ok) loadProfiles();
+};
+document.getElementById('refresh').onclick = loadProfiles;
+for (const id of ids) document.getElementById(id).addEventListener('input', preview);
+
+preview(); loadProfiles();
+</script>
+</body>
+</html>

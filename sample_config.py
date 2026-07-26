@@ -209,3 +209,20 @@ UPSTREAM_BRANCH = "master"
 AUTO_UPDATE = False
 UPDATE_PKGS = True
 UPGRADE_PACKAGES = False
+
+# ── NEO-WZML ULTRA ──────────────────────────────────────────────
+# Inline button accent: none | blue | red | green | purple | orange
+# | yellow | diamond | star | arrow | bracket  (set via /bsetting)
+BUTTON_STYLE = "none"
+
+# Advanced auto-rename template applied to every uploaded file.
+# Placeholders: {title} {season} {episode} {quality} {year}
+# ({season_raw}/{episode_raw} = unpadded). Per-user via /autorename.
+# Example: "[MyGroup] {title} - S{season}E{episode} [{quality}]"
+AUTO_RENAME = ""
+
+# FileToLink streaming gateway (/link, /stream, /f2l).
+# Needs BASE_URL; files are stored in FILETOLINK_CHAT (bot must be
+# admin there) and fall back to LEECH_DUMP_CHAT when unset.
+FILETOLINK_ENABLED = False
+FILETOLINK_CHAT = ""

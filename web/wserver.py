@@ -431,6 +431,125 @@ async def homepage(request: Request):
     return templates.TemplateResponse(request, "landing.html")
 
 
+# ──────────────────────── Encoding profiles ───────────────────────
+
+
+def _encode_auth(user: str, token: str):
+    from web.encode_store import verify_user
+
+    if not user or not str(user).isdigit() or not verify_user(user, token):
+        raise HTTPException(status_code=403, detail="Invalid or missing token")
+    return int(user)
+
+
+async def _profiles_db():
+    """Mongo handle for the web process (bot's `database` lives in the
+    bot process, so open our own short-lived client)."""
+    if not Config.DATABASE_URL:
+        return None, None
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    client = AsyncIOMotorClient(Config.DATABASE_URL)
+    bot_id = (Config.BOT_TOKEN or ":").split(":", 1)[0]
+    return client, client.neowzml.users[bot_id] if bot_id else None
+
+
+async def _load_profiles(user_id):
+    client, coll = await _profiles_db()
+    if coll is None:
+        return dict(Config.FFMPEG_CMDS or {})
+    try:
+        doc = await coll.find_one({"_id": user_id}, {"FFMPEG_CMDS": 1}) or {}
+        return doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {})
+    finally:
+        if client is not None:
+            client.close()
+
+
+async def _save_profiles(user_id, profiles):
+    client, coll = await _profiles_db()
+    if coll is None:
+        return False
+    try:
+        await coll.update_one(
+            {"_id": user_id}, {"$set": {"FFMPEG_CMDS": profiles}}, upsert=True
+        )
+        return True
+    finally:
+        if client is not None:
+            client.close()
+
+
+@app.get("/app/encode-profiles", response_class=HTMLResponse)
+async def encode_profiles_page(request: Request, user: str = "", token: str = ""):
+    _encode_auth(user, token)
+    return templates.TemplateResponse(request, "encode_profiles.html")
+
+
+@app.post("/api/encode/preview")
+async def encode_preview(request: Request, user: str = "", token: str = ""):
+    _encode_auth(user, token)
+    from web.encode_store import build_command
+
+    try:
+        profile = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed body")
+    try:
+        return JSONResponse({"command": build_command(profile)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/encode/profiles")
+async def encode_list(user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    return JSONResponse({"profiles": await _load_profiles(user_id)})
+
+
+@app.post("/api/encode/profiles")
+async def encode_save(request: Request, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    from web.encode_store import build_command, validate_name
+
+    try:
+        profile = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed body")
+
+    name = validate_name(profile.get("name"))
+    if not name:
+        return JSONResponse(
+            {"error": "Name must be 1-40 chars: letters, digits, _ or -"},
+            status_code=400,
+        )
+    try:
+        command = build_command(profile)
+    except Exception as e:
+        return JSONResponse({"error": f"Invalid profile: {e}"}, status_code=400)
+
+    profiles = await _load_profiles(user_id)
+    profiles[name] = [command]
+    if not await _save_profiles(user_id, profiles):
+        return JSONResponse(
+            {"error": "DATABASE_URL is not configured — can't persist"},
+            status_code=503,
+        )
+    return JSONResponse({"ok": True, "name": name, "command": command})
+
+
+@app.delete("/api/encode/profiles/{name}")
+async def encode_delete(name: str, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    profiles = await _load_profiles(user_id)
+    if name not in profiles:
+        return JSONResponse({"error": "No such profile"}, status_code=404)
+    profiles.pop(name)
+    if not await _save_profiles(user_id, profiles):
+        return JSONResponse({"error": "DATABASE_URL is not configured"}, status_code=503)
+    return JSONResponse({"ok": True})
+
+
 # ─────────────────────────── FileToLink ───────────────────────────
 
 

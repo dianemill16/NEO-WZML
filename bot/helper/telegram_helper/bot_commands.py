@@ -47,6 +47,7 @@ class BotCommands:
         "BotSet": ["bsetting", "bs"],
         "UserSet": ["usetting", "us"],
         "AutoRename": ["autorename", "arn"],
+        "FileToLink": ["link", "stream", "f2l"],
         "Select": ["select", "sel"],
         "SpeedTest": ["speedtest", "stest"],
         "Plugins": "plugins",

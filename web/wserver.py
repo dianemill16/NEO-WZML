@@ -6,7 +6,7 @@ install()
 
 from asyncio import sleep, to_thread
 from hashlib import blake2b
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from contextlib import asynccontextmanager
 from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getLogger
 
@@ -38,6 +38,17 @@ from web.rclone_selection_store import (
     update_selected_ids as set_rclone_selected_ids,
 )
 from aiohttp import ClientSession
+
+# the web server runs as its own gunicorn process, so it loads config
+# itself (FileToLink needs BOT_TOKEN/HELPER_TOKENS and the bin chat)
+from bot.core.config_manager import Config
+
+try:
+    Config.load()
+except Exception:
+    # missing/incomplete config only disables FileToLink; the rest of
+    # the web UI (torrent/file selection) must still come up
+    pass
 
 getLogger("httpx").setLevel(WARNING)
 getLogger("aiohttp").setLevel(WARNING)
@@ -77,6 +88,9 @@ async def lifespan(app: FastAPI):
     await qbittorrent.close()
     if proxy_session is not None:
         await proxy_session.close()
+    from web.streamer import StreamClients
+
+    await StreamClients.stop()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -415,6 +429,145 @@ async def set_aria2(gid, selected_files):
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
     return templates.TemplateResponse(request, "landing.html")
+
+
+# ─────────────────────────── FileToLink ───────────────────────────
+
+
+async def _stream_response(message_id: int, sig: str, request: Request, as_attachment):
+    from fastapi.responses import StreamingResponse
+
+    from web.streamer import (
+        ByteStreamer,
+        CHUNK_SIZE,
+        StreamClients,
+        range_params,
+        verify,
+    )
+
+    chat_id = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
+    if not chat_id:
+        raise HTTPException(status_code=503, detail="FileToLink is not configured")
+    chat_id = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+
+    if not verify(chat_id, message_id, sig):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+
+    await StreamClients.start()
+    index, client = StreamClients.pick()
+    streamer = ByteStreamer(client, index)
+
+    try:
+        file_id, file_size, file_name, mime_type = await streamer.get_properties(
+            chat_id, message_id
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        LOGGER.error(f"FileToLink properties error: {e}")
+        raise HTTPException(status_code=502, detail="Unable to read file")
+
+    if not file_size:
+        raise HTTPException(status_code=404, detail="Empty file")
+
+    range_header = request.headers.get("Range")
+    start, end = 0, file_size - 1
+    partial = False
+    if range_header:
+        try:
+            raw_range = range_header.replace("bytes=", "").split("-")
+            start = int(raw_range[0]) if raw_range[0] else 0
+            end = int(raw_range[1]) if len(raw_range) > 1 and raw_range[1] else end
+            partial = True
+        except ValueError:
+            raise HTTPException(status_code=416, detail="Malformed Range header")
+    if start < 0 or end >= file_size or start > end:
+        return JSONResponse(
+            {"error": "Requested range not satisfiable"},
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    offset, first_cut, last_cut, part_count = range_params(start, end, file_size)
+    disposition = "attachment" if as_attachment else "inline"
+    safe_name = quote(file_name)
+    headers = {
+        "Content-Type": mime_type,
+        "Content-Length": str(end - start + 1),
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'{disposition}; filename="{safe_name}"',
+        "Cache-Control": "public, max-age=3600",
+    }
+    if partial:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+    async def body():
+        StreamClients.acquire(index)
+        try:
+            async for chunk in streamer.yield_file(
+                file_id, offset, first_cut, last_cut, part_count
+            ):
+                yield chunk
+        except Exception as e:
+            LOGGER.error(f"FileToLink stream aborted: {e}")
+        finally:
+            StreamClients.release(index)
+            await streamer.close()
+
+    return StreamingResponse(
+        body(),
+        status_code=206 if partial else 200,
+        headers=headers,
+        media_type=mime_type,
+    )
+
+
+@app.head("/stream/{message_id}/{sig}")
+@app.get("/stream/{message_id}/{sig}")
+async def stream_media(message_id: int, sig: str, request: Request):
+    return await _stream_response(message_id, sig, request, as_attachment=False)
+
+
+@app.head("/dl/{message_id}/{sig}")
+@app.get("/dl/{message_id}/{sig}")
+async def download_media(message_id: int, sig: str, request: Request):
+    return await _stream_response(message_id, sig, request, as_attachment=True)
+
+
+@app.get("/watch/{message_id}/{sig}", response_class=HTMLResponse)
+async def watch_media(message_id: int, sig: str, request: Request):
+    from web.streamer import ByteStreamer, StreamClients, verify
+
+    chat_id = Config.FILETOLINK_CHAT or Config.LEECH_DUMP_CHAT
+    if not chat_id:
+        raise HTTPException(status_code=503, detail="FileToLink is not configured")
+    chat_id = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    if not verify(chat_id, message_id, sig):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+
+    await StreamClients.start()
+    index, client = StreamClients.pick()
+    streamer = ByteStreamer(client, index)
+    try:
+        _, file_size, file_name, mime_type = await streamer.get_properties(
+            chat_id, message_id
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return templates.TemplateResponse(
+        request,
+        "player.html",
+        {
+            "file_name": file_name,
+            "file_size": file_size,
+            "mime_type": mime_type,
+            "stream_url": f"/stream/{message_id}/{sig}",
+            "download_url": f"/dl/{message_id}/{sig}",
+            "is_video": mime_type.startswith("video/"),
+            "is_audio": mime_type.startswith("audio/"),
+        },
+    )
 
 
 def rewrite_location(location: str, proxy_prefix: str) -> str:

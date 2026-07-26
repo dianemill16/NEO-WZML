@@ -37,6 +37,7 @@ from .stats import bot_stats, stats_pages, get_packages_version
 from .status import task_status, status_pages
 from .users_settings import get_users_settings, edit_user_settings, send_user_settings
 from .autorename import auto_rename
+from .filetolink import file_to_link
 from .ytdlp import ytdl, ytdl_leech
 from .speedtest import speedtest
 from . import dump_select
@@ -102,6 +103,7 @@ __all__ = [
     "edit_user_settings",
     "send_user_settings",
     "auto_rename",
+    "file_to_link",
     "ytdl",
     "ytdl_leech",
     "speedtest",

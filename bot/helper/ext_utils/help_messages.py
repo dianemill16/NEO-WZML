@@ -1183,7 +1183,7 @@ config_descriptions = {
 
     "STATUS_LIMIT": "Max number of tasks shown per status message page",
     "STATUS_UPDATE_INTERVAL": "Seconds between status message updates",
-    "BOT_THEME": "Visual theme for bot messages. Available themes in bot/helper/themes/",
+    "BOT_THEME": "Visual theme for bot messages: 'ultra' (default, matches the web UI), 'minimal', or 'random'. Add more as bot/helper/themes/neo_<name>.py",
     "TIMEZONE": "Timezone for timestamps in messages. Format: Region/City",
     "SHOW_CLOUD_LINK": "Show cloud storage link button in status messages",
     "SHOW_MEDIAINFO": "Show MediaInfo button for leeched video files",

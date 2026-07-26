@@ -437,6 +437,91 @@ async def homepage(request: Request):
     return templates.TemplateResponse(request, "landing.html")
 
 
+# ─────────────────────── Google token generator ───────────────────
+
+
+def _token_page(request, **ctx):
+    ctx.setdefault("title", "Google Token Generator")
+    return templates.TemplateResponse(request, "token_generator.html", ctx)
+
+
+@app.get("/app/token-generator", response_class=HTMLResponse)
+async def token_generator_page(request: Request, user_id: str = "", token: str = ""):
+    from web.security import PURPOSE_GOOGLE, verify_signed_token
+    from web.token_gen import authorization_url, credentials_available
+    from web.security import pack_state
+
+    if not user_id.isdigit() or not verify_signed_token(
+        PURPOSE_GOOGLE, user_id, token
+    ):
+        return _token_page(
+            request,
+            state="error",
+            message="This link is invalid or has expired. Run /tokengen again.",
+        )
+    if not credentials_available():
+        return _token_page(
+            request,
+            state="error",
+            message=(
+                "credentials.json is missing on the bot host. The owner must add "
+                "Google OAuth client credentials before tokens can be generated."
+            ),
+        )
+    if not Config.BASE_URL:
+        return _token_page(
+            request, state="error", message="BASE_URL is not configured."
+        )
+
+    try:
+        url = authorization_url(pack_state(PURPOSE_GOOGLE, user_id, token))
+    except Exception as e:
+        LOGGER.error(f"TokenGen: failed to build auth url: {e}")
+        return _token_page(
+            request, state="error", message=f"Couldn't start Google sign-in: {e}"
+        )
+    return _token_page(request, state="start", auth_url=url, user_id=user_id)
+
+
+@app.get("/app/token-generator/callback", response_class=HTMLResponse)
+async def token_generator_callback(
+    request: Request, code: str = "", state: str = "", error: str = ""
+):
+    from web.security import PURPOSE_GOOGLE, unpack_state, verify_signed_token
+    from web.token_gen import exchange_code, store_token
+
+    if error:
+        return _token_page(
+            request, state="error", message=f"Google returned: {error}"
+        )
+
+    purpose, user_id, token = unpack_state(state)
+    if (
+        purpose != PURPOSE_GOOGLE
+        or user_id is None
+        or not verify_signed_token(PURPOSE_GOOGLE, user_id, token)
+    ):
+        return _token_page(
+            request,
+            state="error",
+            message="This authorization link is invalid or expired. Run /tokengen again.",
+        )
+    if not code:
+        return _token_page(
+            request, state="error", message="No authorization code returned."
+        )
+
+    try:
+        token_bytes = await to_thread(exchange_code, code, state)
+        await store_token(user_id, token_bytes)
+    except Exception as e:
+        LOGGER.error(f"TokenGen: exchange failed for {user_id}: {e}")
+        return _token_page(request, state="error", message=str(e))
+
+    LOGGER.info(f"TokenGen: stored token.pickle for user {user_id}")
+    return _token_page(request, state="done", user_id=user_id)
+
+
 # ──────────────────────── Encoding profiles ───────────────────────
 
 

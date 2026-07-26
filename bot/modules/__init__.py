@@ -39,6 +39,7 @@ from .users_settings import get_users_settings, edit_user_settings, send_user_se
 from .autorename import auto_rename
 from .filetolink import file_to_link
 from .encode_profiles import encode_profiles
+from .token_generator import token_generator
 from .ytdlp import ytdl, ytdl_leech
 from .speedtest import speedtest
 from . import dump_select
@@ -106,6 +107,7 @@ __all__ = [
     "auto_rename",
     "file_to_link",
     "encode_profiles",
+    "token_generator",
     "ytdl",
     "ytdl_leech",
     "speedtest",

@@ -9,7 +9,7 @@ class Config:
     AUTHORIZED_CHATS = ""
     BUTTON_STYLE = "none"  # inline button accent: see BUTTON_STYLES
     EXCEP_CHATS = ""
-    BOT_THEME = "neo_minimal"
+    BOT_THEME = "ultra"
     BASE_URL = ""
     BASE_URL_PORT = 80
     BOT_TOKEN = ""

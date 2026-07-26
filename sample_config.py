@@ -226,3 +226,7 @@ AUTO_RENAME = ""
 # admin there) and fall back to LEECH_DUMP_CHAT when unset.
 FILETOLINK_ENABLED = False
 FILETOLINK_CHAT = ""
+
+# Chat response theme: "ultra" (default, matches the ULTRA web UI),
+# "minimal" (previous look), "random", or any bot/helper/themes/neo_*.py
+BOT_THEME = "ultra"

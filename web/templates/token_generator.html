@@ -108,10 +108,18 @@
             <div class="step">
               <span class="num">3</span>
               <span>
-                Upload the downloaded <b>credentials.json</b> through
-                <b>/bsetting → Private Files</b>, then run
-                <b>/tokengen</b> again.
+                Give the bot those credentials — any one of:<br />
+                • set <code>GOOGLE_CLIENT_ID</code> and
+                <code>GOOGLE_CLIENT_SECRET</code> in <b>/bsetting</b><br />
+                • paste the whole file into
+                <code>GOOGLE_CREDENTIALS_JSON</code><br />
+                • send <code>credentials.json</code> as a document, or paste
+                its contents, in <b>/bsetting → Private Files</b>
               </span>
+            </div>
+            <div class="step">
+              <span class="num">4</span>
+              <span>Run <b>/tokengen</b> again — no restart needed.</span>
             </div>
           </div>
           {% endif %}

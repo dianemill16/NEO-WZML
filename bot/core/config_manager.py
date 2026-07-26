@@ -81,6 +81,10 @@ class Config:
     FILETOLINK_ENABLED = False
     FILETOLINK_CHAT = ""  # bin channel for /link; falls back to LEECH_DUMP_CHAT
     FILETOLINK_AUTO = True  # auto-link files sent straight to the bot in PM
+    # /tokengen — used to auto-create credentials.json when it's absent
+    GOOGLE_CLIENT_ID = ""
+    GOOGLE_CLIENT_SECRET = ""
+    GOOGLE_CREDENTIALS_JSON = ""  # or paste the whole client file here
     LINKS_LOG_ID = ""
     MIRROR_LOG_ID = ""
     CLEAN_LOG_MSG = False

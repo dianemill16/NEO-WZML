@@ -234,3 +234,12 @@ BOT_THEME = "ultra"
 # Auto-generate FileToLink links when a file is sent straight to the
 # bot in PM (users can opt out individually in /usetting)
 FILETOLINK_AUTO = True
+
+# /tokengen — Google OAuth client (type: Web application). Add
+# <BASE_URL>/app/token-generator/callback as an authorized redirect URI.
+# Set these and credentials.json is written automatically on startup,
+# so there's no need to upload the file through Telegram.
+GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_SECRET = ""
+# Or paste the whole credentials.json contents instead of the two above:
+GOOGLE_CREDENTIALS_JSON = ""

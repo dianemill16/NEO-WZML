@@ -391,6 +391,16 @@ async def update_variables():
 
 
 async def load_configurations():
+    # build credentials.json from config if the owner supplied the OAuth
+    # client there instead of uploading the file (Telegram rejects .json
+    # on some clients)
+    try:
+        from web.token_gen import ensure_credentials_file
+
+        ensure_credentials_file()
+    except Exception as e:
+        LOGGER.error(f"Could not prepare credentials.json: {e}")
+
     if not await aiopath.exists(".netrc"):
         async with aiopen(".netrc", "w"):
             pass

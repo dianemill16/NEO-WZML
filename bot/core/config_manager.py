@@ -7,6 +7,7 @@ from os import getenv
 class Config:
     AS_DOCUMENT = False
     AUTHORIZED_CHATS = ""
+    BUTTON_STYLE = "none"  # inline button accent: see BUTTON_STYLES
     EXCEP_CHATS = ""
     BOT_THEME = "neo_minimal"
     BASE_URL = ""

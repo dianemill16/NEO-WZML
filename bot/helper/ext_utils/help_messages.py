@@ -1061,6 +1061,7 @@ def get_help_string(user_id=None, is_sudo=False):
 
 
 config_descriptions = {
+    "BUTTON_STYLE": "Accent style for inline buttons (none/blue/red/green/purple/orange/yellow/diamond/star/arrow/bracket). Set via /bsetting > Button Style",
     "BOT_TOKEN": "The Telegram Bot Token that you got from @BotFather",
     "OWNER_ID": "Your Telegram numeric User ID (not username)",
     "TELEGRAM_API": "Telegram API ID from my.telegram.org for user session features",

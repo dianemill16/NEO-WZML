@@ -112,12 +112,45 @@ UPSTREAM_REPO = (config_file.get("UPSTREAM_REPO") or "").strip() if AUTO_UPDATE 
 UPSTREAM_BRANCH = (config_file.get("UPSTREAM_BRANCH") or "").strip() or "wzv3"
 
 if UPSTREAM_REPO:
-    if path.exists(".git"):
-        srun(["rm", "-rf", ".git"])
+    # Verify the branch exists BEFORE touching the working tree. The old
+    # order deleted .git first, so a wrong UPSTREAM_BRANCH left the deploy
+    # in a half-reset state with a bare "Something went Wrong" message.
+    probe = srun(
+        ["git", "ls-remote", "--heads", UPSTREAM_REPO, UPSTREAM_BRANCH],
+        capture_output=True,
+        text=True,
+    )
+    branch_exists = probe.returncode == 0 and bool((probe.stdout or "").strip())
 
-    update = srun(
-        [
-            f"git init -q \
+    if not branch_exists:
+        if probe.returncode != 0:
+            log_error(
+                f"Cannot reach UPSTREAM_REPO ({UPSTREAM_REPO}): "
+                f"{(probe.stderr or '').strip()}"
+            )
+        else:
+            heads = srun(
+                ["git", "ls-remote", "--heads", UPSTREAM_REPO],
+                capture_output=True,
+                text=True,
+            )
+            names = " ".join(
+                line.rsplit("refs/heads/", 1)[-1]
+                for line in (heads.stdout or "").splitlines()
+                if "refs/heads/" in line
+            )
+            log_error(
+                f"UPSTREAM_BRANCH '{UPSTREAM_BRANCH}' does not exist in "
+                f"{UPSTREAM_REPO}. Available branches: {names or 'none found'}"
+            )
+        log_info("Skipping auto-update — keeping the currently deployed code.")
+    else:
+        if path.exists(".git"):
+            srun(["rm", "-rf", ".git"])
+
+        update = srun(
+            [
+                f"git init -q \
                      && git config --global user.email 89005882+irisXDR@users.noreply.github.com \
                      && git config --global user.name アイリス \
                      && git add . \
@@ -125,16 +158,17 @@ if UPSTREAM_REPO:
                      && git remote add origin {UPSTREAM_REPO} \
                      && git fetch origin -q \
                      && git reset --hard origin/{UPSTREAM_BRANCH} -q"
-        ],
-        shell=True,
-    )
+            ],
+            shell=True,
+        )
+
+        if update.returncode == 0:
+            log_info("Successfully updated with Latest Updates !")
+        else:
+            log_error("Something went Wrong ! Recheck your details or Ask Support !")
 
     repo = UPSTREAM_REPO.split("/")
     UPSTREAM_REPO = f"https://github.com/{repo[-2]}/{repo[-1]}"
-    if update.returncode == 0:
-        log_info("Successfully updated with Latest Updates !")
-    else:
-        log_error("Something went Wrong ! Recheck your details or Ask Support !")
     log_info(f"UPSTREAM_REPO: {UPSTREAM_REPO} | UPSTREAM_BRANCH: {UPSTREAM_BRANCH}")
 elif AUTO_UPDATE:
     log_info(

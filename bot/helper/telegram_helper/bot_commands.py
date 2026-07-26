@@ -48,7 +48,6 @@ class BotCommands:
         "UserSet": ["usetting", "us"],
         "AutoRename": ["autorename", "arn"],
         "FileToLink": ["link", "stream", "f2l"],
-        "Encode": ["encode", "enc"],
         "TokenGen": ["tokengen", "tg"],
         "Select": ["select", "sel"],
         "SpeedTest": ["speedtest", "stest"],

@@ -17,7 +17,7 @@ class NeoStyle:
 <i>Mirror & leech anything — torrents, direct links, Mega, Drive, yt-dlp —
 to your cloud, to Telegram, or to a streaming link.</i>
 
-┃ <b>Encoding profiles</b> · <code>/encode</code>
+┃ <b>Encoding profiles</b> · <code>/usetting</code>
 ┃ <b>Auto-rename</b> · <code>/autorename</code>
 ┃ <b>File to link</b> · <code>/link</code>
 

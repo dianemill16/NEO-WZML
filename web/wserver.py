@@ -604,6 +604,10 @@ async def token_generator_callback(
 
 
 # ──────────────────────── Encoding profiles ───────────────────────
+#
+# Two things are stored per user: ENCODE_PROFILES holds the editable
+# spec so the builder can reopen a profile, and FFMPEG_CMDS holds the
+# generated command so `-ff <name>` keeps working untouched.
 
 
 def _encode_auth(user: str, token: str):
@@ -614,24 +618,32 @@ def _encode_auth(user: str, token: str):
     return int(user)
 
 
-async def _load_profiles(user_id):
+async def _load_encode(user_id):
+    """Returns (specs, commands)."""
     from web.mongo import users_collection
 
     coll = users_collection()
     if coll is None:
-        return dict(Config.FFMPEG_CMDS or {})
-    doc = await coll.find_one({"_id": user_id}, {"FFMPEG_CMDS": 1}) or {}
-    return doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {})
+        return {}, dict(Config.FFMPEG_CMDS or {})
+    doc = await coll.find_one(
+        {"_id": user_id}, {"ENCODE_PROFILES": 1, "FFMPEG_CMDS": 1}
+    ) or {}
+    return (
+        doc.get("ENCODE_PROFILES") or {},
+        doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {}),
+    )
 
 
-async def _save_profiles(user_id, profiles):
+async def _save_encode(user_id, specs, commands):
     from web.mongo import users_collection
 
     coll = users_collection()
     if coll is None:
         return False
     await coll.update_one(
-        {"_id": user_id}, {"$set": {"FFMPEG_CMDS": profiles}}, upsert=True
+        {"_id": user_id},
+        {"$set": {"ENCODE_PROFILES": specs, "FFMPEG_CMDS": commands}},
+        upsert=True,
     )
     return True
 
@@ -639,7 +651,31 @@ async def _save_profiles(user_id, profiles):
 @app.get("/app/encode-profiles", response_class=HTMLResponse)
 async def encode_profiles_page(request: Request, user: str = "", token: str = ""):
     _encode_auth(user, token)
-    return templates.TemplateResponse(request, "encode_profiles.html")
+    from web.encode_store import (
+        AUDIO_CODECS,
+        CONTAINERS,
+        DISPOSITIONS,
+        NAMED_PRESETS,
+        PIX_FMTS,
+        RESOLUTIONS,
+        TEMPLATES,
+        VIDEO_CODECS,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "encode_profiles.html",
+        {
+            "video_codecs": list(VIDEO_CODECS),
+            "audio_codecs": list(AUDIO_CODECS),
+            "named_presets": list(NAMED_PRESETS),
+            "pix_fmts": list(PIX_FMTS),
+            "containers": list(CONTAINERS),
+            "resolutions": list(RESOLUTIONS),
+            "dispositions": list(DISPOSITIONS),
+            "templates": TEMPLATES,
+        },
+    )
 
 
 @app.post("/api/encode/preview")
@@ -660,13 +696,14 @@ async def encode_preview(request: Request, user: str = "", token: str = ""):
 @app.get("/api/encode/profiles")
 async def encode_list(user: str = "", token: str = ""):
     user_id = _encode_auth(user, token)
-    return JSONResponse({"profiles": await _load_profiles(user_id)})
+    specs, commands = await _load_encode(user_id)
+    return JSONResponse({"profiles": commands, "specs": specs})
 
 
 @app.post("/api/encode/profiles")
 async def encode_save(request: Request, user: str = "", token: str = ""):
     user_id = _encode_auth(user, token)
-    from web.encode_store import build_command, validate_name
+    from web.encode_store import build_command, normalize, validate_name
 
     try:
         profile = await request.json()
@@ -680,13 +717,24 @@ async def encode_save(request: Request, user: str = "", token: str = ""):
             status_code=400,
         )
     try:
+        spec = normalize(profile)
         command = build_command(profile)
     except Exception as e:
         return JSONResponse({"error": f"Invalid profile: {e}"}, status_code=400)
 
-    profiles = await _load_profiles(user_id)
-    profiles[name] = [command]
-    if not await _save_profiles(user_id, profiles):
+    specs, commands = await _load_encode(user_id)
+    # renaming an existing profile shouldn't leave the old one behind
+    if (old := profile.get("rename_from")) and old != name:
+        specs.pop(old, None)
+        commands.pop(old, None)
+
+    if spec.get("is_default"):
+        for other in specs.values():
+            other["is_default"] = False
+    specs[name] = spec
+    commands[name] = [command]
+
+    if not await _save_encode(user_id, specs, commands):
         return JSONResponse(
             {"error": "DATABASE_URL is not configured — can't persist"},
             status_code=503,
@@ -694,14 +742,28 @@ async def encode_save(request: Request, user: str = "", token: str = ""):
     return JSONResponse({"ok": True, "name": name, "command": command})
 
 
+@app.post("/api/encode/profiles/{name}/default")
+async def encode_set_default(name: str, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    specs, commands = await _load_encode(user_id)
+    if name not in specs:
+        return JSONResponse({"error": "No such profile"}, status_code=404)
+    for key, spec in specs.items():
+        spec["is_default"] = key == name
+    if not await _save_encode(user_id, specs, commands):
+        return JSONResponse({"error": "DATABASE_URL is not configured"}, status_code=503)
+    return JSONResponse({"ok": True, "name": name})
+
+
 @app.delete("/api/encode/profiles/{name}")
 async def encode_delete(name: str, user: str = "", token: str = ""):
     user_id = _encode_auth(user, token)
-    profiles = await _load_profiles(user_id)
-    if name not in profiles:
+    specs, commands = await _load_encode(user_id)
+    if name not in commands and name not in specs:
         return JSONResponse({"error": "No such profile"}, status_code=404)
-    profiles.pop(name)
-    if not await _save_profiles(user_id, profiles):
+    specs.pop(name, None)
+    commands.pop(name, None)
+    if not await _save_encode(user_id, specs, commands):
         return JSONResponse({"error": "DATABASE_URL is not configured"}, status_code=503)
     return JSONResponse({"ok": True})
 

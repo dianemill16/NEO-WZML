@@ -85,27 +85,41 @@ async def _build_links(source_msg, title="Link Generated"):
     """Copy one media message into the bin chat and render its links.
     Returns (text, markup) or raises."""
     bin_chat = _bin_chat()
-    # Copy the message object we already hold rather than
-    # Client.copy_message(), which re-fetches by id — that fetch comes
-    # back empty wherever the bot can't read history (groups without
-    # admin/privacy-off), and Message.copy() then silently returns None.
-    stored = await source_msg.copy(
-        chat_id=bin_chat, disable_notification=True
-    )
-    if isinstance(stored, list):
-        stored = stored[0] if stored else None
-    if stored is None:
-        raise ValueError(
-            "Telegram refused to copy this message. If it's in a group, "
-            "make the bot an admin there (or disable its privacy mode) so "
-            "it can read the file."
-        )
+
+    if source_msg.chat and source_msg.chat.id == bin_chat:
+        # Already sitting in the bin chat — copying would post a duplicate
+        # of the file right back into the conversation.
+        stored = source_msg
+    else:
+        # Copy the message object we already hold rather than
+        # Client.copy_message(), which re-fetches by id — that fetch comes
+        # back empty wherever the bot can't read history (groups without
+        # admin/privacy-off), and Message.copy() then silently returns None.
+        stored = await source_msg.copy(chat_id=bin_chat, disable_notification=True)
+        if isinstance(stored, list):
+            stored = stored[0] if stored else None
+        if stored is None:
+            raise ValueError(
+                "Telegram refused to copy this message. If it's in a group, "
+                "make the bot an admin there (or disable its privacy mode) so "
+                "it can read the file."
+            )
 
     from web.streamer import make_path
 
-    media = _get_media(stored)
-    file_name = getattr(media, "file_name", "") or "file"
-    file_size = getattr(media, "file_size", 0) or 0
+    # Name/size come from the ORIGINAL message: Telegram rewrites the
+    # filename on some copied media (dots become underscores), and the
+    # user should see the name they recognise.
+    src_media = _get_media(source_msg) or _get_media(stored)
+    media = _get_media(stored) or src_media
+    file_name = (
+        getattr(src_media, "file_name", "")
+        or getattr(media, "file_name", "")
+        or "file"
+    )
+    file_size = getattr(src_media, "file_size", 0) or getattr(
+        media, "file_size", 0
+    ) or 0
     path = make_path(bin_chat, stored.id)
 
     base_url = Config.BASE_URL.rstrip("/")

@@ -53,9 +53,10 @@ async def token_generator(_, message):
     await send_message(
         message,
         "<blockquote><b>◈ GOOGLE TOKEN GENERATOR</b></blockquote>\n"
-        f"┃ Sign in with Google to {status}.\n"
-        "┃ Your <code>token.pickle</code> is stored privately and used\n"
-        "┃ for your own Drive uploads.\n\n"
+        f"┃ Open the page to {status}.\n"
+        "┃ Bring your own Google OAuth client — upload\n"
+        "┃ <code>credentials.json</code> or paste its ID and secret.\n"
+        "┃ The token is stored privately for your Drive uploads.\n\n"
         f"✦ <i>Link is personal and expires in "
         f"{TOKEN_PAGE_TTL_SECONDS // 60} minutes.</i>",
         buttons.build_menu(1),

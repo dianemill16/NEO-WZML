@@ -13,8 +13,16 @@ from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getL
 from aioaria2 import Aria2HttpClient
 from aiohttp.client_exceptions import ClientError
 from aioqbt.client import create_client
-from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import (
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from aioqbt.exc import AQError
 
@@ -440,6 +448,10 @@ async def homepage(request: Request):
 
 
 # ─────────────────────── Google token generator ───────────────────
+#
+# The user brings their own OAuth client (upload credentials.json or
+# paste id/secret), so the bot host needs no credentials.json. An owner
+# client, when configured, is offered as a one-click default.
 
 
 def _token_page(request, **ctx):
@@ -447,68 +459,133 @@ def _token_page(request, **ctx):
     return templates.TemplateResponse(request, "token_generator.html", ctx)
 
 
+def _token_auth_ok(user_id, token):
+    from web.security import PURPOSE_GOOGLE, verify_signed_token
+
+    return user_id.isdigit() and verify_signed_token(PURPOSE_GOOGLE, user_id, token)
+
+
 @app.get("/app/token-generator", response_class=HTMLResponse)
 async def token_generator_page(request: Request, user_id: str = "", token: str = ""):
-    from web.security import PURPOSE_GOOGLE, verify_signed_token
-    from web.token_gen import authorization_url, credentials_available
-    from web.security import pack_state
+    from web.token_gen import host_credentials, redirect_uri
 
-    if not user_id.isdigit() or not verify_signed_token(
-        PURPOSE_GOOGLE, user_id, token
-    ):
+    if not _token_auth_ok(user_id, token):
         return _token_page(
             request,
             state="error",
             message="This link is invalid or has expired. Run /tokengen again.",
-        )
-    if not credentials_available():
-        return _token_page(
-            request,
-            state="error",
-            message=(
-                "credentials.json is missing on the bot host, so Google "
-                "sign-in can't start."
-            ),
-            # rendered as escaped values by the template, never as HTML
-            fix_callback=f"{Config.BASE_URL.rstrip('/')}/app/token-generator/callback",
         )
     if not Config.BASE_URL:
         return _token_page(
             request, state="error", message="BASE_URL is not configured."
         )
 
-    try:
-        url = authorization_url(pack_state(PURPOSE_GOOGLE, user_id, token))
-    except Exception as e:
-        LOGGER.error(f"TokenGen: failed to build auth url: {e}")
+    host_id, _ = host_credentials()
+    return _token_page(
+        request,
+        state="form",
+        user_id=user_id,
+        token=token,
+        has_host_client=bool(host_id),
+        redirect_uri=redirect_uri(),
+    )
+
+
+@app.post("/app/token-generator", response_class=HTMLResponse)
+async def token_generator_start(
+    request: Request,
+    user_id: str = Form(""),
+    token: str = Form(""),
+    mode: str = Form("own"),
+    client_id: str = Form(""),
+    client_secret: str = Form(""),
+    credentials_file: UploadFile = File(None),
+):
+    from web.token_gen import (
+        host_credentials,
+        parse_client_json,
+        redirect_uri,
+        authorization_url,
+        stash_client,
+        validate_client,
+    )
+
+    if not _token_auth_ok(user_id, token):
         return _token_page(
-            request, state="error", message=f"Couldn't start Google sign-in: {e}"
+            request,
+            state="error",
+            message="This link is invalid or has expired. Run /tokengen again.",
         )
-    return _token_page(request, state="start", auth_url=url, user_id=user_id)
+
+    def back(err):
+        host_id, _ = host_credentials()
+        return _token_page(
+            request,
+            state="form",
+            user_id=user_id,
+            token=token,
+            has_host_client=bool(host_id),
+            redirect_uri=redirect_uri(),
+            form_error=err,
+        )
+
+    try:
+        if mode == "host":
+            cid, secret = host_credentials()
+            if not cid:
+                return back("The owner hasn't configured a shared Google client.")
+        elif credentials_file is not None and credentials_file.filename:
+            raw = (await credentials_file.read(64 * 1024 + 1)).decode(
+                "utf-8", "replace"
+            )
+            cid, secret = parse_client_json(raw)
+        elif client_id or client_secret:
+            cid, secret = validate_client(client_id, client_secret)
+        else:
+            return back(
+                "Upload your credentials.json, or paste the client ID and secret."
+            )
+    except ValueError as e:
+        return back(str(e))
+    except Exception as e:
+        LOGGER.error(f"TokenGen: bad client input: {e}")
+        return back("Couldn't read that credentials file.")
+
+    nonce = stash_client(user_id, cid, secret)
+    return RedirectResponse(authorization_url(cid, nonce), status_code=303)
 
 
 @app.get("/app/token-generator/callback", response_class=HTMLResponse)
 async def token_generator_callback(
     request: Request, code: str = "", state: str = "", error: str = ""
 ):
-    from web.security import PURPOSE_GOOGLE, unpack_state, verify_signed_token
-    from web.token_gen import exchange_code, store_token
+    from web.token_gen import exchange_code, store_token, take_client
 
     if error:
+        return _token_page(request, state="error", message=f"Google returned: {error}")
+    if not state:
         return _token_page(
-            request, state="error", message=f"Google returned: {error}"
+            request, state="error", message="Google returned no state value."
         )
 
-    purpose, user_id, token = unpack_state(state)
-    if (
-        purpose != PURPOSE_GOOGLE
-        or user_id is None
-        or not verify_signed_token(PURPOSE_GOOGLE, user_id, token)
-    ):
+    # the nonce identifies both the pending client and its owner
+    from web.token_gen import _PENDING, _sweep
+
+    _sweep()
+    entry = _PENDING.get(state)
+    if not entry:
         return _token_page(
             request,
             state="error",
-            message="This authorization link is invalid or expired. Run /tokengen again.",
+            message="This sign-in expired or was already used. Run /tokengen again.",
+        )
+    user_id = entry["user_id"]
+    cid, secret = take_client(state, user_id)
+    if not cid:
+        return _token_page(
+            request,
+            state="error",
+            message="This sign-in expired or was already used. Run /tokengen again.",
         )
     if not code:
         return _token_page(
@@ -516,7 +593,7 @@ async def token_generator_callback(
         )
 
     try:
-        token_bytes = await to_thread(exchange_code, code, state)
+        token_bytes = await exchange_code(code, cid, secret)
         await store_token(user_id, token_bytes)
     except Exception as e:
         LOGGER.error(f"TokenGen: exchange failed for {user_id}: {e}")

@@ -1063,9 +1063,9 @@ def get_help_string(user_id=None, is_sudo=False):
 config_descriptions = {
     "BUTTON_STYLE": "Accent style for inline buttons (none/blue/red/green/purple/orange/yellow/diamond/star/arrow/bracket). Set via /bsetting > Button Style",
     "FILETOLINK_ENABLED": "Enable /link streaming gateway. Needs BASE_URL and FILETOLINK_CHAT (or LEECH_DUMP_CHAT)",
-    "GOOGLE_CLIENT_ID": "OAuth Web-application client ID for /tokengen. With GOOGLE_CLIENT_SECRET, credentials.json is created automatically on startup",
-    "GOOGLE_CLIENT_SECRET": "OAuth client secret paired with GOOGLE_CLIENT_ID for /tokengen",
-    "GOOGLE_CREDENTIALS_JSON": "Alternative to the two above: paste the entire credentials.json contents here",
+    "GOOGLE_CLIENT_ID": "Optional shared OAuth client ID for /tokengen, offered as a one-click default. Users can always bring their own client instead",
+    "GOOGLE_CLIENT_SECRET": "Optional client secret paired with GOOGLE_CLIENT_ID for /tokengen",
+    "GOOGLE_CREDENTIALS_JSON": "Optional: paste an entire credentials.json to act as the shared /tokengen client",
     "FILETOLINK_AUTO": "Auto-generate links when a file is sent straight to the bot in PM. Users can opt out in /usetting",
     "FILETOLINK_CHAT": "Bin channel where /link stores files for streaming. Bot must be admin. Falls back to LEECH_DUMP_CHAT",
     "AUTO_RENAME": "Global auto-rename template, e.g. {title} - S{season}E{episode} [{quality}]. Per-user via /autorename",

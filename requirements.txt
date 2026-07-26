@@ -27,6 +27,8 @@ pillow
 psutil
 pycountry
 pymongo
+# required by FastAPI for the /tokengen form + credentials.json upload
+python-multipart
 python-magic
 pytz
 qbittorrent-api

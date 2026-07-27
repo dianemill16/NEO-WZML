@@ -106,6 +106,13 @@ class TelegramUploader:
         self._helper_index = None
         self._prep_lock = Lock()
         self._is_log_del = False
+        # BOT_PM: instead of copying each file to the user's PM as it lands
+        # in the dump chat (which used to race with HyperUpload's parallel
+        # sends and get FloodWait-throttled into silent failure), every
+        # sent message is queued here in upload order, then forwarded to
+        # the PM as one sequential pass by the main bot after the whole
+        # task's files have all finished uploading to the dump chat.
+        self._bot_pm_queue = []
 
     def _check_cancelled(self):
         if self._listener.is_cancelled:
@@ -431,22 +438,13 @@ class TelegramUploader:
         self._sent_msg = msgs_list[-1]
         self._reply_to_id = self._sent_msg.id
 
-    async def _copy_media(self):
-        if (
-            not self._bot_pm
-            or not self._sent_msg
-            or self._listener.is_cancelled
-        ):
-            return
-
+    async def _forward_one_to_pm(self, from_chat_id, message_id, file_name, reply_to_message_id):
+        """Copy a single already-uploaded dump-chat message to the user's
+        PM via the main bot. Always called from _flush_bot_pm_queue, one
+        message at a time, never in parallel with itself."""
         chat_id = self._listener.user_id
-        from_chat_id = self._upload_chat_id
-        message_id = self._sent_msg.id
         if from_chat_id == chat_id:
-            return
-
-        reply_to_message_id = self._listener.pm_msg.id if self._listener.pm_msg else None
-        file_name = ospath.basename(self._up_path) if self._up_path else ""
+            return True
 
         last_err = None
         flood_waits = 0
@@ -455,7 +453,7 @@ class TelegramUploader:
         max_total_wait = 30 * 60
         for attempt in range(1, 7):
             if self._listener.is_cancelled:
-                return
+                return False
             try:
                 await TgClient.bot.copy_message(
                     chat_id=chat_id,
@@ -463,14 +461,14 @@ class TelegramUploader:
                     message_id=message_id,
                     reply_to_message_id=reply_to_message_id,
                 )
-                return
+                return True
             except (FloodWait, FloodPremiumWait) as f:
                 last_err = f
                 delay = f.value * 1.3
                 flood_waits += 1
                 total_wait += delay
                 LOGGER.warning(
-                    f"FloodWait while copying to BotPM (attempt {attempt}/6): {f}"
+                    f"FloodWait while forwarding to BotPM (attempt {attempt}/6): {f}"
                 )
                 await sleep(delay)
                 if flood_waits >= max_flood_waits or total_wait >= max_total_wait:
@@ -481,7 +479,7 @@ class TelegramUploader:
 
                 if reply_to_message_id is not None and any(x in error_msg for x in ["reply", "thread", "message to reply"]):
                     LOGGER.warning(
-                        "BotPM copy failed with reply_to_message_id="
+                        "BotPM forward failed with reply_to_message_id="
                         f"{reply_to_message_id}. Retrying without it: {e}"
                     )
                     reply_to_message_id = None
@@ -496,7 +494,7 @@ class TelegramUploader:
                     if attempt < 6:
                         backoff = min(2 ** attempt, 10)
                         LOGGER.warning(
-                            f"BotPM copy: Message not accessible yet (attempt {attempt}/6). "
+                            f"BotPM forward: Message not accessible yet (attempt {attempt}/6). "
                             f"Possible propagation delay. Retrying after {backoff}s..."
                         )
                         await sleep(backoff)
@@ -508,7 +506,7 @@ class TelegramUploader:
                 last_err = e
                 backoff = min(2 ** (attempt - 1), 8)
                 LOGGER.warning(
-                    f"RPCError while copying to BotPM (attempt {attempt}/6): {e}"
+                    f"RPCError while forwarding to BotPM (attempt {attempt}/6): {e}"
                 )
                 await sleep(backoff)
             except Exception as e:
@@ -520,6 +518,43 @@ class TelegramUploader:
                 "Failed To Send in BotPM after retries: "
                 f"{last_err} | user_id={chat_id} "
                 f"from_chat_id={from_chat_id} message_id={message_id} file={file_name}"
+            )
+        return False
+
+    async def _flush_bot_pm_queue(self):
+        """Runs once, after every file in this task has already finished
+        uploading to the dump chat. Walks self._bot_pm_queue strictly in
+        upload order and forwards each file to the user's PM via the main
+        bot, one at a time. This replaces the old per-file copy-as-you-go
+        approach, which raced with HyperUpload's parallel helper-bot sends
+        and could get FloodWait-throttled into silently dropping files.
+        Doing it as a single ordered pass, after uploading is done, means
+        the main bot is never fighting the helper bots for send capacity,
+        and episodes/parts land in the PM in the same order they landed
+        in the dump chat."""
+        if not self._bot_pm or not self._bot_pm_queue:
+            return
+
+        reply_to_message_id = self._listener.pm_msg.id if self._listener.pm_msg else None
+        sent_any = False
+        for from_chat_id, message_id, file_name in self._bot_pm_queue:
+            if self._listener.is_cancelled:
+                return
+            ok = await self._forward_one_to_pm(
+                from_chat_id, message_id, file_name, reply_to_message_id
+            )
+            if ok:
+                sent_any = True
+            # small pacing gap between forwards — this is now the ONLY
+            # thing hitting the main bot for PM copies, so a short,
+            # consistent delay keeps it well under flood limits without
+            # needing to lean on the retry loop
+            await sleep(0.5)
+
+        if not sent_any and not self._listener.is_cancelled:
+            LOGGER.error(
+                f"BotPM: failed to forward any of {len(self._bot_pm_queue)} "
+                f"file(s) to user {self._listener.user_id}"
             )
 
     async def upload(self):
@@ -570,6 +605,7 @@ class TelegramUploader:
                 f"Files Corrupted or unable to upload. {self._error or 'Check logs!'}"
             )
             return
+        await self._flush_bot_pm_queue()
         LOGGER.info(f"Leech Completed: {self._listener.name}")
         await self._cleanup_auto_thumb()
         await self._listener.on_upload_complete(
@@ -653,6 +689,16 @@ class TelegramUploader:
                     and hasattr(self._sent_msg, "link")
                 ):
                     self._msgs_dict[self._sent_msg.link] = file_
+                if (
+                    not self._is_corrupted
+                    and self._bot_pm
+                    and self._sent_msg is not None
+                    and getattr(self._sent_msg, "chat", None) is not None
+                    and self._sent_msg.chat.id != self._listener.user_id
+                ):
+                    self._bot_pm_queue.append(
+                        (self._upload_chat_id, self._sent_msg.id, file_)
+                    )
                 if self._helper_index is None:
                     # flood-avoid delay for single-client uploads;
                     # HyperUpload rotates helper bots instead
@@ -1067,6 +1113,16 @@ class TelegramUploader:
                 and hasattr(self._sent_msg, "link")
             ):
                 self._msgs_dict[self._sent_msg.link] = file_
+            if (
+                not self._is_corrupted
+                and self._bot_pm
+                and self._sent_msg is not None
+                and getattr(self._sent_msg, "chat", None) is not None
+                and self._sent_msg.chat.id != self._listener.user_id
+            ):
+                self._bot_pm_queue.append(
+                    (self._upload_chat_id, self._sent_msg.id, file_)
+                )
         except CancelledUpload:
             raise
         except Exception as err:
@@ -1343,8 +1399,9 @@ class TelegramUploader:
                     self._last_msg_in_group = True
 
         if self._sent_msg:
-            await sleep(0.6)
-            await self._copy_media()
+            # BOT_PM copy no longer happens here per-file — see
+            # _bot_pm_queue / _flush_bot_pm_queue for the batched,
+            # end-of-task, strictly-ordered forward instead.
             if self._listener.leech_dest:
                 try:
                     leech_dest = self._listener.leech_dest

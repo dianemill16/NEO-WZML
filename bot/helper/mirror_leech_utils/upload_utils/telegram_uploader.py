@@ -446,48 +446,6 @@ class TelegramUploader:
         if from_chat_id == chat_id:
             return True
 
-        # Confirm the main bot's own session can actually see this
-        # message before attempting to act on it. A message a helper
-        # bot just created can take a moment to propagate to a
-        # different client's session/DC — checking (and retrying the
-        # check, not just the action) tells us definitively whether
-        # we're dealing with a propagation delay or something else,
-        # instead of guessing from copy_message's error alone.
-        visible = False
-        for check_attempt in range(1, 5):
-            if self._listener.is_cancelled:
-                return False
-            try:
-                probe = await TgClient.bot.get_messages(
-                    chat_id=from_chat_id, message_ids=message_id
-                )
-                probe_empty = getattr(probe, "empty", False)
-                if probe is not None and not probe_empty:
-                    visible = True
-                    LOGGER.info(
-                        f"BotPM: main bot confirmed message {message_id} visible "
-                        f"in {from_chat_id} on check {check_attempt}/4 for {file_name}"
-                    )
-                    break
-                LOGGER.warning(
-                    f"BotPM: main bot does NOT see message {message_id} in "
-                    f"{from_chat_id} yet (check {check_attempt}/4, empty="
-                    f"{probe_empty}) for {file_name}"
-                )
-            except Exception as e:
-                LOGGER.warning(
-                    f"BotPM: get_messages check failed (attempt "
-                    f"{check_attempt}/4) for {file_name}: {e}"
-                )
-            await sleep(3)
-
-        if not visible:
-            LOGGER.error(
-                f"BotPM: giving up — main bot never saw message {message_id} "
-                f"in {from_chat_id} for file={file_name} after 4 checks"
-            )
-            return False
-
         last_err = None
         flood_waits = 0
         total_wait = 0.0
@@ -503,38 +461,19 @@ class TelegramUploader:
                     message_id=message_id,
                     reply_to_message_id=reply_to_message_id,
                 )
-                result_id = getattr(result, "id", None)
-                result_link = getattr(result, "link", None)
-                LOGGER.info(
-                    f"BotPM: copy_message returned id={result_id} "
-                    f"link={result_link} for file={file_name} "
-                    f"target_chat={chat_id}"
-                )
-                if result_id is not None:
+                if getattr(result, "id", None) is not None:
                     return True
-                # wzgram's copy_message came back without raising, but
-                # also without a usable Message (id=None) — this has been
-                # observed specifically on messages that originated from
-                # the raw-API HyperUpload path. Don't trust a bare
-                # non-exception return as success; fall back to
-                # forward_messages, which is a much more standard, widely
-                # exercised method and doesn't share this quirk.
-                LOGGER.warning(
-                    f"BotPM: copy_message gave no usable id for {file_name} — "
-                    "falling back to forward_messages"
-                )
+                # wzgram's copy_message can come back without raising but
+                # also without a usable Message on certain sources — fall
+                # back to forward_messages as a cheap safety net rather
+                # than trusting a bare non-exception return as success.
                 fwd = await TgClient.bot.forward_messages(
                     chat_id=chat_id,
                     from_chat_id=from_chat_id,
                     message_ids=message_id,
                 )
                 fwd_msg = fwd[0] if isinstance(fwd, list) else fwd
-                fwd_id = getattr(fwd_msg, "id", None)
-                LOGGER.info(
-                    f"BotPM: forward_messages fallback returned id={fwd_id} "
-                    f"for file={file_name} target_chat={chat_id}"
-                )
-                if fwd_id is not None:
+                if getattr(fwd_msg, "id", None) is not None:
                     return True
                 last_err = RuntimeError(
                     "copy_message and forward_messages both returned no usable id"
@@ -648,12 +587,6 @@ class TelegramUploader:
             f"BotPM: flushing {len(self._bot_pm_queue)} file(s) to user "
             f"{self._listener.user_id}"
         )
-        # give Telegram a moment to fully propagate the just-created
-        # messages to the main bot's session/DC before we try to act on
-        # them — a message that a helper bot just created can otherwise
-        # briefly appear as MESSAGE_ID_INVALID to a different client
-        # asking about it right away
-        await sleep(5)
         reply_to_message_id = self._listener.pm_msg.id if self._listener.pm_msg else None
         sent = 0
         for from_chat_id, message_id, file_name in self._bot_pm_queue:
@@ -665,10 +598,6 @@ class TelegramUploader:
             )
             if ok:
                 sent += 1
-                LOGGER.info(
-                    f"BotPM: forwarded '{file_name}' to user "
-                    f"{self._listener.user_id} ({sent}/{len(self._bot_pm_queue)})"
-                )
             # small pacing gap between forwards — this is now the ONLY
             # thing hitting the main bot for PM copies, so a short,
             # consistent delay keeps it well under flood limits without

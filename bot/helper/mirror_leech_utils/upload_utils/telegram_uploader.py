@@ -446,6 +446,48 @@ class TelegramUploader:
         if from_chat_id == chat_id:
             return True
 
+        # Confirm the main bot's own session can actually see this
+        # message before attempting to act on it. A message a helper
+        # bot just created can take a moment to propagate to a
+        # different client's session/DC — checking (and retrying the
+        # check, not just the action) tells us definitively whether
+        # we're dealing with a propagation delay or something else,
+        # instead of guessing from copy_message's error alone.
+        visible = False
+        for check_attempt in range(1, 5):
+            if self._listener.is_cancelled:
+                return False
+            try:
+                probe = await TgClient.bot.get_messages(
+                    chat_id=from_chat_id, message_ids=message_id
+                )
+                probe_empty = getattr(probe, "empty", False)
+                if probe is not None and not probe_empty:
+                    visible = True
+                    LOGGER.info(
+                        f"BotPM: main bot confirmed message {message_id} visible "
+                        f"in {from_chat_id} on check {check_attempt}/4 for {file_name}"
+                    )
+                    break
+                LOGGER.warning(
+                    f"BotPM: main bot does NOT see message {message_id} in "
+                    f"{from_chat_id} yet (check {check_attempt}/4, empty="
+                    f"{probe_empty}) for {file_name}"
+                )
+            except Exception as e:
+                LOGGER.warning(
+                    f"BotPM: get_messages check failed (attempt "
+                    f"{check_attempt}/4) for {file_name}: {e}"
+                )
+            await sleep(3)
+
+        if not visible:
+            LOGGER.error(
+                f"BotPM: giving up — main bot never saw message {message_id} "
+                f"in {from_chat_id} for file={file_name} after 4 checks"
+            )
+            return False
+
         last_err = None
         flood_waits = 0
         total_wait = 0.0
@@ -606,6 +648,12 @@ class TelegramUploader:
             f"BotPM: flushing {len(self._bot_pm_queue)} file(s) to user "
             f"{self._listener.user_id}"
         )
+        # give Telegram a moment to fully propagate the just-created
+        # messages to the main bot's session/DC before we try to act on
+        # them — a message that a helper bot just created can otherwise
+        # briefly appear as MESSAGE_ID_INVALID to a different client
+        # asking about it right away
+        await sleep(5)
         reply_to_message_id = self._listener.pm_msg.id if self._listener.pm_msg else None
         sent = 0
         for from_chat_id, message_id, file_name in self._bot_pm_queue:

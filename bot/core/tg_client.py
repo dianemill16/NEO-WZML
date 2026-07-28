@@ -76,12 +76,6 @@ class TgClient:
             f"NEO-WZML-Bot{cls.ID}",
             bot_token=Config.BOT_TOKEN,
             workdir="/usr/src/app",
-            # previously left at the library default (3) since this was
-            # never passed for the main bot, unlike helper bots which
-            # already get HYPER_THREADS (or 8). That silently throttled
-            # every classic (non-hyper) upload/download and any transfer
-            # driven by the main bot specifically.
-            max_concurrent_transmissions=Config.HYPER_THREADS or 8,
         )
         await cls.bot.start()
         cls.BNAME = cls.bot.me.username
@@ -119,7 +113,6 @@ class TgClient:
                     session_string=session_string,
                     sleep_threshold=60,
                     no_updates=True,
-                    max_concurrent_transmissions=Config.HYPER_THREADS or 8,
                 )
                 await cls.user.start()
                 cls.IS_PREMIUM_USER = cls.user.me.is_premium

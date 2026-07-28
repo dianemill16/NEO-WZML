@@ -455,11 +455,18 @@ class TelegramUploader:
             if self._listener.is_cancelled:
                 return False
             try:
-                await TgClient.bot.copy_message(
+                result = await TgClient.bot.copy_message(
                     chat_id=chat_id,
                     from_chat_id=from_chat_id,
                     message_id=message_id,
                     reply_to_message_id=reply_to_message_id,
+                )
+                result_id = getattr(result, "id", None)
+                result_link = getattr(result, "link", None)
+                LOGGER.info(
+                    f"BotPM: copy_message returned id={result_id} "
+                    f"link={result_link} for file={file_name} "
+                    f"target_chat={chat_id}"
                 )
                 return True
             except (FloodWait, FloodPremiumWait) as f:

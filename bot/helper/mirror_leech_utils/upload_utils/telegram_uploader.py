@@ -559,24 +559,43 @@ class TelegramUploader:
 
     async def _flush_bot_pm_queue(self):
         """Runs once, after every file in this task has already finished
-        uploading to the dump chat. Walks self._bot_pm_queue strictly in
-        upload order and forwards each file to the user's PM via the main
-        bot, one at a time. This replaces the old per-file copy-as-you-go
-        approach, which raced with HyperUpload's parallel helper-bot sends
-        and could get FloodWait-throttled into silently dropping files.
-        Doing it as a single ordered pass, after uploading is done, means
-        the main bot is never fighting the helper bots for send capacity,
-        and episodes/parts land in the PM in the same order they landed
-        in the dump chat."""
+        uploading to the dump chat — and, crucially, after any media-group
+        consolidation (_send_media_group) has already run and settled.
+
+        Files are recorded as soon as each one is individually sent, but
+        HyperUpload/consolidation can later delete that individual message
+        and replace it with a new grouped-album message (see
+        _send_media_group, which deletes the per-file messages and
+        re-adds their replacements to self._msgs_dict). Queuing at
+        send-time — the original approach — could therefore end up
+        holding message ids for messages that no longer exist by the
+        time this runs, which Telegram rejects as MESSAGE_ID_INVALID
+        despite the id looking perfectly plausible.
+
+        self._msgs_dict is the one structure that's kept correctly in
+        sync with whatever messages actually survive consolidation (it's
+        also what powers the "Files List" summary), so we rebuild the PM
+        queue from it here, at the very end, instead of trusting
+        anything recorded earlier mid-task."""
         if not self._bot_pm:
             LOGGER.info(
                 "BotPM: skipped — bot_pm is not enabled for this task "
                 f"(user={self._listener.user_id})"
             )
             return
+
+        self._bot_pm_queue = []
+        for link, file_name in self._msgs_dict.items():
+            try:
+                message_id = int(link.rstrip("/").split("/")[-1])
+            except (ValueError, IndexError):
+                LOGGER.warning(f"BotPM: couldn't parse message id from link: {link}")
+                continue
+            self._bot_pm_queue.append((self._upload_chat_id, message_id, file_name))
+
         if not self._bot_pm_queue:
             LOGGER.info(
-                "BotPM: skipped — nothing was queued for this task "
+                "BotPM: skipped — nothing in _msgs_dict to forward for this task "
                 f"(user={self._listener.user_id}, is_super_chat="
                 f"{getattr(self._listener, 'is_super_chat', None)}, "
                 f"up_dest={getattr(self._listener, 'up_dest', None)})"
@@ -758,24 +777,6 @@ class TelegramUploader:
                     and hasattr(self._sent_msg, "link")
                 ):
                     self._msgs_dict[self._sent_msg.link] = file_
-                if (
-                    not self._is_corrupted
-                    and self._bot_pm
-                    and self._sent_msg is not None
-                    and getattr(self._sent_msg, "chat", None) is not None
-                    and self._sent_msg.chat.id != self._listener.user_id
-                ):
-                    self._bot_pm_queue.append(
-                        (self._upload_chat_id, self._sent_msg.id, file_)
-                    )
-                    LOGGER.info(f"BotPM: queued '{file_}' for later PM forward")
-                elif self._bot_pm and not self._is_corrupted:
-                    LOGGER.info(
-                        f"BotPM: NOT queuing '{file_}' — sent_msg="
-                        f"{self._sent_msg is not None}, chat="
-                        f"{getattr(self._sent_msg, 'chat', None)}, "
-                        f"user_id={self._listener.user_id}"
-                    )
                 if self._helper_index is None:
                     # flood-avoid delay for single-client uploads;
                     # HyperUpload rotates helper bots instead
@@ -1190,24 +1191,6 @@ class TelegramUploader:
                 and hasattr(self._sent_msg, "link")
             ):
                 self._msgs_dict[self._sent_msg.link] = file_
-            if (
-                not self._is_corrupted
-                and self._bot_pm
-                and self._sent_msg is not None
-                and getattr(self._sent_msg, "chat", None) is not None
-                and self._sent_msg.chat.id != self._listener.user_id
-            ):
-                self._bot_pm_queue.append(
-                    (self._upload_chat_id, self._sent_msg.id, file_)
-                )
-                LOGGER.info(f"BotPM: queued '{file_}' for later PM forward (hyper)")
-            elif self._bot_pm and not self._is_corrupted:
-                LOGGER.info(
-                    f"BotPM: NOT queuing '{file_}' (hyper) — sent_msg="
-                    f"{self._sent_msg is not None}, chat="
-                    f"{getattr(self._sent_msg, 'chat', None)}, "
-                    f"user_id={self._listener.user_id}"
-                )
         except CancelledUpload:
             raise
         except Exception as err:

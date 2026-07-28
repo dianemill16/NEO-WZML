@@ -468,7 +468,36 @@ class TelegramUploader:
                     f"link={result_link} for file={file_name} "
                     f"target_chat={chat_id}"
                 )
-                return True
+                if result_id is not None:
+                    return True
+                # wzgram's copy_message came back without raising, but
+                # also without a usable Message (id=None) — this has been
+                # observed specifically on messages that originated from
+                # the raw-API HyperUpload path. Don't trust a bare
+                # non-exception return as success; fall back to
+                # forward_messages, which is a much more standard, widely
+                # exercised method and doesn't share this quirk.
+                LOGGER.warning(
+                    f"BotPM: copy_message gave no usable id for {file_name} — "
+                    "falling back to forward_messages"
+                )
+                fwd = await TgClient.bot.forward_messages(
+                    chat_id=chat_id,
+                    from_chat_id=from_chat_id,
+                    message_ids=message_id,
+                )
+                fwd_msg = fwd[0] if isinstance(fwd, list) else fwd
+                fwd_id = getattr(fwd_msg, "id", None)
+                LOGGER.info(
+                    f"BotPM: forward_messages fallback returned id={fwd_id} "
+                    f"for file={file_name} target_chat={chat_id}"
+                )
+                if fwd_id is not None:
+                    return True
+                last_err = RuntimeError(
+                    "copy_message and forward_messages both returned no usable id"
+                )
+                break
             except (FloodWait, FloodPremiumWait) as f:
                 last_err = f
                 delay = f.value * 1.3

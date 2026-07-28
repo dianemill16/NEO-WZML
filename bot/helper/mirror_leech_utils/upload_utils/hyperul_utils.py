@@ -105,28 +105,66 @@ async def raw_send_media(
         except Exception:
             reply_to = None
 
+    sent_random_id = MsgId()
     r = await client.invoke(
         raw.functions.messages.SendMedia(
             peer=peer,
             media=media,
             message=text,
-            random_id=MsgId(),
+            random_id=sent_random_id,
             entities=entities,
             silent=True,
             reply_to=reply_to,
         )
     )
 
+    # Telegram can bundle updates unrelated to this specific send (read
+    # receipts, activity from other chats a busy helper bot is also a
+    # member of, etc.) into the same Updates container as the one for
+    # our own message. Grabbing the first UpdateNewMessage /
+    # UpdateNewChannelMessage by type alone — the old behavior — can
+    # therefore pick up the WRONG message id, from an entirely different
+    # chat, if one happens to be bundled in first. That produces a
+    # message id which looks valid at queue time but is later rejected
+    # by Telegram as MESSAGE_ID_INVALID when something tries to act on
+    # it in what it assumes is chat_id's history.
+    #
+    # UpdateMessageID maps OUR OWN random_id -> the real message id and
+    # is authoritative for identifying our own send; prefer it. Only
+    # fall back to a type-based match if that's genuinely absent, and
+    # even then, verify the candidate's peer actually matches the chat
+    # we sent to before trusting it.
+    target_channel_id = getattr(peer, "channel_id", None)
+    target_chat_id = getattr(peer, "chat_id", None)
+    target_user_id = getattr(peer, "user_id", None)
+
     msg_id = None
+    fallback_msg_id = None
     for update in r.updates:
+        if (
+            isinstance(update, raw.types.UpdateMessageID)
+            and update.random_id == sent_random_id
+        ):
+            msg_id = update.id
+            break
         if isinstance(
             update,
             (raw.types.UpdateNewMessage, raw.types.UpdateNewChannelMessage),
         ):
-            msg_id = update.message.id
-            break
-        if isinstance(update, raw.types.UpdateMessageID):
-            msg_id = update.id
+            msg_peer = getattr(update.message, "peer_id", None)
+            belongs_to_target = (
+                (target_channel_id is not None
+                 and getattr(msg_peer, "channel_id", None) == target_channel_id)
+                or (target_chat_id is not None
+                    and getattr(msg_peer, "chat_id", None) == target_chat_id)
+                or (target_user_id is not None
+                    and getattr(msg_peer, "user_id", None) == target_user_id)
+            )
+            if belongs_to_target:
+                fallback_msg_id = update.message.id
+
+    if msg_id is None:
+        msg_id = fallback_msg_id
 
     if msg_id is None:
         raise ValueError("HyperUL: SendMedia returned no message id")

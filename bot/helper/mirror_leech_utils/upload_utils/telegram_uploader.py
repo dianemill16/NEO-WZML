@@ -37,7 +37,13 @@ from pyrogram.types import (
 from bot.core.config_manager import Config
 from bot.core.tg_client import TgClient
 from bot.helper.ext_utils.bot_utils import sync_to_async
-from bot.helper.ext_utils.files_utils import check_strict_file_mode, get_base_name, is_archive
+from bot.helper.ext_utils.files_utils import (
+    check_strict_file_mode,
+    get_base_name,
+    is_archive,
+    is_archive_split,
+    is_first_archive_split,
+)
 from bot.helper.ext_utils.status_utils import get_readable_file_size, get_readable_time
 from bot.helper.telegram_helper.message_utils import send_message
 from bot.helper.ext_utils.media_utils import (
@@ -753,6 +759,16 @@ class TelegramUploader:
         if thumb is not None and thumb != "none" and not await aiopath.exists(thumb):
             thumb = None
         is_video, is_audio, is_image = await get_document_type(self._up_path)
+        # Split-file parts beyond the first (.002, .003, ...) are raw
+        # byte-offset fragments, not valid standalone media containers —
+        # ffmpeg thumbnail extraction on them is guaranteed to fail. It
+        # was still being attempted on every single part of every split
+        # leech, each failed attempt burning real wall-clock time and
+        # CPU, which under load (multiple helper bots + aria2/qBittorrent
+        # running concurrently) was enough to starve the whole VPS.
+        skip_thumb = is_archive_split(self._up_path) and not is_first_archive_split(
+            self._up_path
+        )
         meta = {
             "duration": 0,
             "width": 0,
@@ -761,7 +777,7 @@ class TelegramUploader:
             "title": None,
         }
 
-        if not is_image and thumb is None:
+        if not is_image and thumb is None and not skip_thumb:
             file_name = ospath.splitext(file_)[0]
             thumb_path = f"{self._path}/yt-dlp-thumb/{file_name}.jpg"
             if await aiopath.isfile(thumb_path):
@@ -773,7 +789,7 @@ class TelegramUploader:
 
         if self._listener.as_doc or (not is_video and not is_audio and not is_image):
             kind = "document"
-            if is_video and thumb is None:
+            if is_video and thumb is None and not skip_thumb:
                 thumb = await get_video_thumbnail(self._up_path, None)
         elif is_video:
             kind = "video"
@@ -786,13 +802,13 @@ class TelegramUploader:
                 )
                 if self._auto_thumb_path:
                     thumb = self._auto_thumb_path
-            if thumb is None and self._listener.thumbnail_layout:
+            if thumb is None and self._listener.thumbnail_layout and not skip_thumb:
                 thumb = await get_multiple_frames_thumbnail(
                     self._up_path,
                     self._listener.thumbnail_layout,
                     self._listener.screen_shots,
                 )
-            if thumb is None:
+            if thumb is None and not skip_thumb:
                 thumb = await get_video_thumbnail(self._up_path, meta["duration"])
             if thumb is not None and thumb != "none":
                 with Image.open(thumb) as img:
@@ -1138,8 +1154,11 @@ class TelegramUploader:
         try:
             self._check_cancelled()
             is_video, is_audio, is_image = await get_document_type(self._up_path)
+            skip_thumb = is_archive_split(self._up_path) and not is_first_archive_split(
+                self._up_path
+            )
 
-            if not is_image and thumb is None:
+            if not is_image and thumb is None and not skip_thumb:
                 file_name = ospath.splitext(file)[0]
                 thumb_path = f"{self._path}/yt-dlp-thumb/{file_name}.jpg"
                 if await aiopath.isfile(thumb_path):
@@ -1155,7 +1174,7 @@ class TelegramUploader:
                 or (not is_video and not is_audio and not is_image)
             ):
                 key = "documents"
-                if is_video and thumb is None:
+                if is_video and thumb is None and not skip_thumb:
                     thumb = await get_video_thumbnail(self._up_path, None)
 
                 self._check_cancelled()
@@ -1194,13 +1213,13 @@ class TelegramUploader:
                         thumb = self._auto_thumb_path
                         LOGGER.info(f"Using auto-fetched thumbnail: {thumb}")
 
-                if thumb is None and self._listener.thumbnail_layout:
+                if thumb is None and self._listener.thumbnail_layout and not skip_thumb:
                     thumb = await get_multiple_frames_thumbnail(
                         self._up_path,
                         self._listener.thumbnail_layout,
                         self._listener.screen_shots,
                     )
-                if thumb is None:
+                if thumb is None and not skip_thumb:
                     thumb = await get_video_thumbnail(self._up_path, duration)
                 if thumb is not None and thumb != "none":
                     with Image.open(thumb) as img:

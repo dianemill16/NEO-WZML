@@ -399,7 +399,20 @@ async def take_ss(video_file, ss_nb) -> bool:
         return False
 
 
+def _is_split_part(file_path):
+    """Detect split leech parts like name.mkv.001, name.mkv.002 etc.
+    Thumbnail extraction on these is invalid since a raw split chunk
+    isn't a decodable container/stream, so we skip it instead of
+    letting ffmpeg fail (and spam logs / burn CPU) on every part."""
+    return bool(re.search(r"\.\d{3}$", ospath.basename(file_path)))
+
+
 async def get_audio_thumbnail(audio_file):
+    if _is_split_part(audio_file):
+        LOGGER.info(
+            f"Skipping audio thumbnail extraction for split part: {audio_file}"
+        )
+        return None
     output_dir = f"{DOWNLOAD_DIR}thumbnails"
     await makedirs(output_dir, exist_ok=True)
     output = ospath.join(output_dir, f"{time()}.jpg")
@@ -436,6 +449,11 @@ async def get_audio_thumbnail(audio_file):
 
 
 async def get_video_thumbnail(video_file, duration):
+    if _is_split_part(video_file):
+        LOGGER.info(
+            f"Skipping video thumbnail extraction for split part: {video_file}"
+        )
+        return None
     output_dir = f"{DOWNLOAD_DIR}thumbnails"
     await makedirs(output_dir, exist_ok=True)
     output = ospath.join(output_dir, f"{time()}.jpg")
@@ -482,6 +500,11 @@ async def get_video_thumbnail(video_file, duration):
 
 
 async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots):
+    if _is_split_part(video_file):
+        LOGGER.info(
+            f"Skipping multi-frame thumbnail extraction for split part: {video_file}"
+        )
+        return None
     layout = re.sub(r"(\d+)\D+(\d+)", r"\1x\2", layout)
     ss_nb = layout.split("x")
     if len(ss_nb) != 2 or not ss_nb[0].isdigit() or not ss_nb[1].isdigit():

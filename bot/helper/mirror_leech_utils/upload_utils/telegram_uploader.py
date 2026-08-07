@@ -1,6 +1,15 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
-from asyncio import Lock, Semaphore, create_task, gather, sleep
+from asyncio import (
+    Lock,
+    Semaphore,
+    TimeoutError as AsyncTimeoutError,
+    create_task,
+    gather,
+    shield,
+    sleep,
+    wait_for,
+)
 from logging import getLogger
 from os import path as ospath, walk
 from re import match as re_match, sub as re_sub
@@ -77,6 +86,7 @@ class TelegramUploader:
         self._upload_chat_id = 0
         self._reply_to_id = 0
         self._start_time = time()
+        self._last_progress_time = time()
         self._total_files = 0
         self._thumb = self._listener.thumb or f"thumbnails/{listener.user_id}.jpg"
         self._msgs_dict = {}
@@ -733,13 +743,15 @@ class TelegramUploader:
             await gather(*tasks, return_exceptions=True)
 
     def _hyper_progress(self, client):
-        state = {"last": 0}
+        state = {"last": 0, "updated_at": time()}
 
         async def progress(current, _):
             if self._listener.is_cancelled:
                 client.stop_transmission()
             self._processed_bytes += current - state["last"]
             state["last"] = current
+            state["updated_at"] = time()
+            self._last_progress_time = time()
 
         return progress, state
 
@@ -912,7 +924,31 @@ class TelegramUploader:
                     return None
                 prog, pstate = self._hyper_progress(client)
                 try:
-                    uploaded = await client.save_file(up_path, progress=prog)
+                    # save_file has no internal timeout: if the helper
+                    # bot's connection dies mid-transfer without raising,
+                    # the await can hang forever with no exception and no
+                    # further progress callbacks — the task then sits
+                    # "stuck" at its last percentage indefinitely. A
+                    # watchdog cancels the attempt if no chunk has arrived
+                    # for STALL_TIMEOUT seconds, so it can retry/give up
+                    # instead of hanging the whole upload.
+                    STALL_TIMEOUT = 120
+                    save_task = create_task(client.save_file(up_path, progress=prog))
+                    while True:
+                        try:
+                            uploaded = await wait_for(shield(save_task), timeout=10)
+                            break
+                        except AsyncTimeoutError:
+                            if self._listener.is_cancelled:
+                                save_task.cancel()
+                                await gather(save_task, return_exceptions=True)
+                                return None
+                            if time() - pstate["updated_at"] >= STALL_TIMEOUT:
+                                save_task.cancel()
+                                await gather(save_task, return_exceptions=True)
+                                raise TimeoutError(
+                                    f"HyperUL save_file stalled for {STALL_TIMEOUT}s with no progress"
+                                )
                 except (FloodWait, FloodPremiumWait) as f:
                     # roll back this attempt's bytes so progress can't
                     # exceed 100%; floods don't burn real-error attempts
@@ -1444,6 +1480,12 @@ class TelegramUploader:
 
     @property
     def speed(self):
+        # if nothing has come in for a while, report 0 instead of a
+        # lifetime average that barely moves — a genuinely stalled
+        # transfer should visibly read 0B/s in /status, not a stale
+        # number that looks like it's still progressing
+        if time() - self._last_progress_time > 30:
+            return 0
         try:
             return self._processed_bytes / (time() - self._start_time)
         except ZeroDivisionError:

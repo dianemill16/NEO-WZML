@@ -138,6 +138,7 @@ class TelegramUploader:
         chunk_size = current - self._last_uploaded
         self._last_uploaded = current
         self._processed_bytes += chunk_size
+        self._last_progress_time = time()
 
     async def _user_settings(self):
         settings_map = {

@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from asyncio import sleep
 
 from bot import task_dict, task_dict_lock, user_data, multi_tags, sudo_users
@@ -141,7 +142,7 @@ def create_cancel_buttons(is_sudo, user_id=""):
             buttons.data_button("All Added Tasks", f"canall bot ms {user_id}")
         else:
             buttons.data_button("My Tasks", f"canall user ms {user_id}")
-    buttons.data_button("Close", f"canall close ms {user_id}")
+    buttons.data_button("Close", f"canall close ms {user_id}", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -195,9 +196,9 @@ async def cancel_all_update(_, query):
             await query.answer("Malformed callback.", show_alert=True)
             return
         buttons = button_build.ButtonMaker()
-        buttons.data_button("Yes!", f"canall {data[2]} confirm {user_id}")
-        buttons.data_button("Back", f"canall back confirm {user_id}")
-        buttons.data_button("Close", f"canall close confirm {user_id}")
+        buttons.data_button("Yes!", f"canall {data[2]} confirm {user_id}", style=ButtonStyle.SUCCESS)
+        buttons.data_button("Back", f"canall back confirm {user_id}", style=ButtonStyle.PRIMARY)
+        buttons.data_button("Close", f"canall close confirm {user_id}", style=ButtonStyle.DANGER)
         button = buttons.build_menu(2)
         await edit_message(
             message, f"Are you sure you want to cancel all {data[2]} tasks", button

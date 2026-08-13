@@ -160,6 +160,7 @@ class Mirror(TaskListener):
             "-tl": "",
             "-ff": set(),
             "-mv": False,
+            "-sl": False,
         }
 
         arg_parser(input_list[1:], args)
@@ -218,6 +219,7 @@ class Mirror(TaskListener):
         self.convert_video = args["-cv"]
 
         self.merge_video = args["-mv"]
+        self.stream_leech = args["-sl"]
 
         self.hybrid_leech = args["-hl"]
         self.thumbnail_layout = args["-tl"]

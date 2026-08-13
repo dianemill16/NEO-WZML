@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from httpx import AsyncClient
 from html import escape
 from urllib.parse import quote
@@ -207,7 +208,7 @@ def api_buttons(user_id, method):
     buttons = ButtonMaker()
     for data, name in SITES.items():
         buttons.data_button(name, f"torser {user_id} {data} {method}")
-    buttons.data_button("Cancel", f"torser {user_id} cancel")
+    buttons.data_button("Cancel", f"torser {user_id} cancel", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -222,7 +223,7 @@ async def plugin_buttons(user_id):
             siteName.capitalize(), f"torser {user_id} {siteName} plugin"
         )
     buttons.data_button("All", f"torser {user_id} all plugin")
-    buttons.data_button("Cancel", f"torser {user_id} cancel")
+    buttons.data_button("Cancel", f"torser {user_id} cancel", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -240,13 +241,13 @@ async def torrent_search(_, message):
     elif len(key) == 1:
         buttons.data_button("Trending", f"torser {user_id} apitrend")
         buttons.data_button("Recent", f"torser {user_id} apirecent")
-        buttons.data_button("Cancel", f"torser {user_id} cancel")
+        buttons.data_button("Cancel", f"torser {user_id} cancel", style=ButtonStyle.DANGER)
         button = buttons.build_menu(2)
         await send_message(message, "Send a search key along with command", button)
     elif SITES is not None and Config.SEARCH_PLUGINS:
         buttons.data_button("Api", f"torser {user_id} apisearch")
         buttons.data_button("Plugins", f"torser {user_id} plugin")
-        buttons.data_button("Cancel", f"torser {user_id} cancel")
+        buttons.data_button("Cancel", f"torser {user_id} cancel", style=ButtonStyle.DANGER)
         button = buttons.build_menu(2)
         await send_message(message, "Choose tool to search:", button)
     elif SITES is not None:

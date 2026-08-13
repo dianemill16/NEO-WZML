@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from asyncio import create_subprocess_exec, gather
 from datetime import datetime
 from os import execl as osexecl
@@ -30,8 +31,8 @@ from bot.helper.telegram_helper.message_utils import (
 @new_task
 async def restart_bot(_, message):
     buttons = button_build.ButtonMaker()
-    buttons.data_button("Yes!", "botrestart confirm")
-    buttons.data_button("No!", "botrestart cancel")
+    buttons.data_button("Yes!", "botrestart confirm", style=ButtonStyle.SUCCESS)
+    buttons.data_button("No!", "botrestart cancel", style=ButtonStyle.DANGER)
     button = buttons.build_menu(2)
     await send_message(
         message, "<i>Are you really sure you want to restart the bot ?</i>", button
@@ -41,8 +42,8 @@ async def restart_bot(_, message):
 @new_task
 async def restart_sessions(_, message):
     buttons = button_build.ButtonMaker()
-    buttons.data_button("Yes!", "sessionrestart confirm")
-    buttons.data_button("No!", "sessionrestart cancel")
+    buttons.data_button("Yes!", "sessionrestart confirm", style=ButtonStyle.SUCCESS)
+    buttons.data_button("No!", "sessionrestart cancel", style=ButtonStyle.DANGER)
     button = buttons.build_menu(2)
     await send_message(
         message,

@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from ast import literal_eval
 from asyncio import (
     create_subprocess_exec,
@@ -63,12 +64,12 @@ bool_vars = [
     'WEB_PINCODE', 'EQUAL_SPLITS', 'DISABLE_DRIVE_LINK',
     'DELETE_LINKS', 'CLEAN_LOG_MSG', 'USER_TD_MODE',
     'INCOMPLETE_TASK_NOTIFIER',
-    'SCREENSHOTS_MODE', 'STRICT_MODE',
+    'SCREENSHOTS_MODE', 'STRICT_FILE_MODE', 'STRICT_AUTH_MODE',
     'DISABLE_TORRENTS', 'DISABLE_LEECH',
     'DISABLE_BULK', 'DISABLE_MULTI', 'DISABLE_SEED',
     'DISABLE_FF_MODE', 'JD_MODE',
     'MEGA_ENABLED', 'TERABOX_ENABLED', 'MEDIA_STORE', 'SHOW_CLOUD_LINK',
-    'UPDATE_PKGS', 'AUTO_UPDATE', 'USE_HYPER',
+    'UPDATE_PKGS', 'AUTO_UPDATE', 'USE_HYPER', 'IS_PREMIUM_USER', 'IS_PREMIUM_BOT',
 ]
 
 start_dict = {}
@@ -140,7 +141,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         buttons.data_button("Qbit Settings", "botset qbit")
         buttons.data_button("Universal Tasks", "botset universal")
         buttons.data_button("Button Style", "botset btnstyle")
-        buttons.data_button("Close", "botset close")
+        buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
         msg = '<blockquote><b><i>Bot Settings:</i></b></blockquote>'
     elif key == "btnstyle":
         from bot.helper.telegram_helper.button_build import BUTTON_STYLES
@@ -150,7 +151,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
             label = f"✅ {name.title()}" if name == current else name.title()
             buttons.data_button(label, f"botset setbtnstyle {name}")
         buttons.data_button("Back", "botset back", position="footer")
-        buttons.data_button("Close", "botset close", position="footer")
+        buttons.data_button("Close", "botset close", position="footer", style=ButtonStyle.DANGER)
         msg = (
             "<blockquote><b><i>Inline Button Style</i></b></blockquote>\n\n"
             "Pick an accent applied to every inline button label.\n"
@@ -184,7 +185,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
             elif key not in bool_vars:
                 if edit_mode:
                     msg += '<i>Send a valid value for the above variable.</i> <b>Timeout:</b> 60 sec'
-                    buttons.data_button("Stop Edit", f"botset editbotvar {key}")
+                    buttons.data_button("Stop Edit", f"botset editbotvar {key}", style=ButtonStyle.DANGER)
                 else:
                     msg += '<i>Click "Edit Value" to modify this variable.</i>'
                     buttons.data_button("Edit Value", f"botset editbotvar {key} edit")
@@ -193,12 +194,12 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
                 buttons.data_button("Default", f"botset resetvar {key}")
 
             buttons.data_button("Back", "botset var", position="footer")
-            buttons.data_button("Close", "botset close", position="footer")
+            buttons.data_button("Close", "botset close", position="footer", style=ButtonStyle.DANGER)
         elif edit_type == "ariavar":
             buttons.data_button("Back", "botset aria")
             if key != "newkey":
                 buttons.data_button("Empty String", f"botset emptyaria {key}")
-            buttons.data_button("Close", "botset close")
+            buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
             msg = (
                 "Send a key with value. Example: https-proxy-user:value. Timeout: 60 sec"
                 if key == "newkey"
@@ -207,7 +208,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         elif edit_type == "qbitvar":
             buttons.data_button("Back", "botset qbit")
             buttons.data_button("Empty String", f"botset emptyqbit {key}")
-            buttons.data_button("Close", "botset close")
+            buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
             msg = f"Send a valid value for {key}. Current value is '{qbit_options[key]}'. Timeout: 60 sec"
     elif key == "var":
         conf_dict = Config.get_all()
@@ -222,7 +223,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         else:
             buttons.data_button("View", "botset view var")
         buttons.data_button("Back", "botset back")
-        buttons.data_button("Close", "botset close")
+        buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
         for x in range(0, len(conf_dict), 10):
             buttons.data_button(
                 f"{int(x / 10)}", f"botset start var {x}", position="footer"
@@ -230,12 +231,12 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         msg = f"Config Variables | Page: {int(offset / 10)} | State: {state}"
     elif key == "private":
         if edit_mode:
-            buttons.data_button("Stop Invoke File", "botset private stop", "header")
+            buttons.data_button("Stop Invoke File", "botset private stop", "header", style=ButtonStyle.DANGER)
         else:
             buttons.data_button("Create New File", "botset private new")
             buttons.data_button("Add/Delete File", "botset private edit")
         buttons.data_button("Back", "botset back", position="footer")
-        buttons.data_button("Close", "botset close", position="footer")
+        buttons.data_button("Close", "botset close", position="footer", style=ButtonStyle.DANGER)
         txt = "\n • ".join(
             [
                 f"<code>{fn}</code>: <b>{'Exists' if await aiopath.isfile(fn) else 'Not Exists'}</b>"
@@ -273,13 +274,13 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         if edit_mode:
             msg += "<i>Send a new value (0 = disabled, or a positive number):</i>\n"
             msg += "<b>Timeout:</b> <code>60 sec</code>"
-            buttons.data_button("Stop Edit", "botset edit universal")
+            buttons.data_button("Stop Edit", "botset edit universal", style=ButtonStyle.DANGER)
         else:
             msg += "<i>Click Edit to modify this value.</i>"
             buttons.data_button("Edit Value", "botset edit universal")
 
         buttons.data_button("Back", "botset back")
-        buttons.data_button("Close", "botset close")
+        buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
     elif key == "aria":
         for k in sorted(list(aria2_options.keys()))[offset : 10 + offset]:
             if k not in ["checksum", "index-out", "out", "pause", "select-file"]:
@@ -290,7 +291,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
             buttons.data_button("View", "botset view aria")
         buttons.data_button("Add new key", "botset ariavar newkey")
         buttons.data_button("Back", "botset back")
-        buttons.data_button("Close", "botset close")
+        buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
         for x in range(0, len(aria2_options), 10):
             buttons.data_button(
                 f"{int(x / 10)}", f"botset start aria {x}", position="footer"
@@ -305,7 +306,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
             buttons.data_button("View", "botset view qbit")
         buttons.data_button("Sync Qbittorrent", "botset syncqbit")
         buttons.data_button("Back", "botset back")
-        buttons.data_button("Close", "botset close")
+        buttons.data_button("Close", "botset close", style=ButtonStyle.DANGER)
         for x in range(0, len(qbit_options), 10):
             buttons.data_button(
                 f"{int(x / 10)}", f"botset start qbit {x}", position="footer"
@@ -615,8 +616,8 @@ async def update_private_file(_, message, pre_message, key, new_file=False):
         if "@github.com" in Config.UPSTREAM_REPO:
             buttons = ButtonMaker()
             msg = "Push to UPSTREAM_REPO ?"
-            buttons.data_button("Yes!", f"botset push {file_name}")
-            buttons.data_button("No", "botset close")
+            buttons.data_button("Yes!", f"botset push {file_name}", style=ButtonStyle.SUCCESS)
+            buttons.data_button("No", "botset close", style=ButtonStyle.DANGER)
             await send_message(message, msg, buttons.build_menu(2))
         else:
             await delete_message(message)

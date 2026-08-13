@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from ast import literal_eval
 from asyncio import Event, wait_for
 from functools import partial
@@ -119,7 +120,7 @@ class YtSelection:
             buttons.data_button("Audio Formats", "ytq audio")
             buttons.data_button("Best Videos", "ytq bv*+ba/b")
             buttons.data_button("Best Audios", "ytq ba/b")
-            buttons.data_button("Cancel", "ytq cancel", "footer")
+            buttons.data_button("Cancel", "ytq cancel", "footer", style=ButtonStyle.DANGER)
             self._main_buttons = buttons.build_menu(3)
             msg = f"Choose Playlist Videos Quality:\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         else:
@@ -172,7 +173,7 @@ class YtSelection:
             buttons.data_button("Audio Formats", "ytq audio")
             buttons.data_button("Best Video", "ytq bv*+ba/b")
             buttons.data_button("Best Audio", "ytq ba/b")
-            buttons.data_button("Cancel", "ytq cancel", "footer")
+            buttons.data_button("Cancel", "ytq cancel", "footer", style=ButtonStyle.DANGER)
             self._main_buttons = buttons.build_menu(2)
             msg = f"Choose Video Quality:\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         self._reply_to = await send_message(
@@ -197,7 +198,7 @@ class YtSelection:
             button_name = f"{tbr}K ({get_readable_file_size(d_data[0])})"
             buttons.data_button(button_name, f"ytq sub {b_name} {tbr}")
         buttons.data_button("Back", "ytq back", "footer")
-        buttons.data_button("Cancel", "ytq cancel", "footer")
+        buttons.data_button("Cancel", "ytq cancel", "footer", style=ButtonStyle.DANGER)
         subbuttons = buttons.build_menu(2)
         msg = f"Choose Bit rate for <b>{b_name}</b>:\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         await edit_message(self._reply_to, msg, subbuttons)
@@ -210,7 +211,7 @@ class YtSelection:
             audio_format = f"ba/b-mp3-{q}"
             buttons.data_button(f"{q}K-mp3", f"ytq {audio_format}")
         buttons.data_button("Back", "ytq back")
-        buttons.data_button("Cancel", "ytq cancel")
+        buttons.data_button("Cancel", "ytq cancel", style=ButtonStyle.DANGER)
         subbuttons = buttons.build_menu(3)
         msg = f"Choose mp3 Audio{i} Bitrate:\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         await edit_message(self._reply_to, msg, subbuttons)
@@ -222,7 +223,7 @@ class YtSelection:
             audio_format = f"ba/b-{frmt}-"
             buttons.data_button(frmt, f"ytq aq {audio_format}")
         buttons.data_button("Back", "ytq back", "footer")
-        buttons.data_button("Cancel", "ytq cancel", "footer")
+        buttons.data_button("Cancel", "ytq cancel", "footer", style=ButtonStyle.DANGER)
         subbuttons = buttons.build_menu(3)
         msg = f"Choose Audio{i} Format:\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         await edit_message(self._reply_to, msg, subbuttons)
@@ -234,7 +235,7 @@ class YtSelection:
             audio_format = f"{format}{qual}"
             buttons.data_button(qual, f"ytq {audio_format}")
         buttons.data_button("Back", "ytq aq back")
-        buttons.data_button("Cancel", "ytq aq cancel")
+        buttons.data_button("Cancel", "ytq aq cancel", style=ButtonStyle.DANGER)
         subbuttons = buttons.build_menu(5)
         msg = f"Choose Audio{i} Qaulity:\n0 is best and 10 is worst\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         await edit_message(self._reply_to, msg, subbuttons)

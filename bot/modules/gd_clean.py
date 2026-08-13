@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from bot.helper.ext_utils.bot_utils import new_task, sync_to_async
 from bot.helper.ext_utils.links_utils import is_gdrive_link
 from bot.helper.ext_utils.status_utils import get_readable_file_size
@@ -46,7 +47,7 @@ async def gdclean_node(_, message):
     buttons = ButtonMaker()
     buttons.data_button("Move to Bin", f"gdclean clear {drive_id} trash")
     buttons.data_button("Permanent Clean", f"gdclean clear {drive_id}")
-    buttons.data_button("Stop", f"gdclean stop", "footer")
+    buttons.data_button("Stop", f"gdclean stop", "footer", style=ButtonStyle.DANGER)
 
     text = f"""<b>Google Drive Clean/Trash</b>
 

@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from pyrogram.filters import regex
 from pyrogram.handlers import CallbackQueryHandler
 
@@ -76,7 +77,7 @@ async def dump_category_callback(_, query):
         )
 
     buttons.data_button("Select All", f"dcat {user_id} {msg_id} All", "header")
-    buttons.data_button("Cancel", f"dcat {user_id} {msg_id} dcancel", "footer")
+    buttons.data_button("Cancel", f"dcat {user_id} {msg_id} dcancel", "footer", style=ButtonStyle.DANGER)
     buttons.data_button("Done (60)", f"dcat {user_id} {msg_id} ddone", "footer")
 
     sel_names = [n for n, cid in ldumps.items() if cid in selected]

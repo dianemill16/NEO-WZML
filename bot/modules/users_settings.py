@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from ast import literal_eval
 from asyncio import sleep
 from functools import partial
@@ -618,7 +619,7 @@ async def get_user_settings(from_user, stype="main"):
             buttons.data_button(
                 "Reset All", f"userset {user_id} confirm_reset_all", position="footer"
             )
-        buttons.data_button("Close", f"userset {user_id} close", position="footer")
+        buttons.data_button("Close", f"userset {user_id} close", position="footer", style=ButtonStyle.DANGER)
 
         text = BotTheme(
             "USER_SETTING",
@@ -661,7 +662,7 @@ async def get_user_settings(from_user, stype="main"):
             )
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         def_cookies = user_dict.get("USE_DEFAULT_COOKIE", False)
         cookie_mode = "Owner's Cookie" if def_cookies else "User's Cookie"
@@ -792,7 +793,7 @@ async def get_user_settings(from_user, stype="main"):
             equal_splits = "Disabled"
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(2)
 
         text = BotTheme(
@@ -812,6 +813,7 @@ async def get_user_settings(from_user, stype="main"):
         )
 
         text += f"\n • <b>Auto Thumbnail:</b> <b>{auto_thumb}</b>"
+        text += f"\n • <b>Thumbnail Layout:</b> <b>{thumb_layout}</b>"
         text += f"\n • <b>Dump Mode:</b> <b>{dump_mode_msg}</b>"
         text += "\n\n<blockquote expandable><b>➜ Thumbnail Priority:</b>"
         text += "\n 1️⃣ Custom Thumbnail (highest)"
@@ -843,7 +845,7 @@ async def get_user_settings(from_user, stype="main"):
             buttons.data_button("Disable Style", f"userset {user_id} set_style", position="header")
 
         buttons.data_button("Back", f"userset {user_id} back leech", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(2)
 
     elif stype == "uphoster":
@@ -856,7 +858,7 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("BuzzHeavier Tools", f"userset {user_id} buzzheavier")
         buttons.data_button("PixelDrain Tools", f"userset {user_id} pixeldrain")
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(1)
 
         destinations = [s.capitalize() for s in uphoster_service.split(",")]
@@ -868,7 +870,7 @@ async def get_user_settings(from_user, stype="main"):
     elif stype == "pixeldrain":
         buttons.data_button("PixelDrain Key", f"userset {user_id} menu PIXELDRAIN_KEY")
         buttons.data_button("Back", f"userset {user_id} back uphoster", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(1)
 
         if user_dict.get("PIXELDRAIN_KEY", False):
@@ -888,7 +890,7 @@ async def get_user_settings(from_user, stype="main"):
             "BuzzHeavier Folder ID", f"userset {user_id} menu BUZZHEAVIER_FOLDER_ID"
         )
         buttons.data_button("Back", f"userset {user_id} back uphoster", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(1)
 
         if user_dict.get("BUZZHEAVIER_TOKEN", False):
@@ -912,7 +914,7 @@ async def get_user_settings(from_user, stype="main"):
             "Gofile Folder ID", f"userset {user_id} menu GOFILE_FOLDER_ID"
         )
         buttons.data_button("Back", f"userset {user_id} back uphoster", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(1)
 
         if user_dict.get("GOFILE_TOKEN", False):
@@ -940,7 +942,7 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("Rclone Flags", f"userset {user_id} menu RCLONE_FLAGS")
 
         buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         rccmsg = "Exists" if await aiopath.exists(rclone_conf) else "Not Exists"
         if user_dict.get("RCLONE_PATH", False):
@@ -995,7 +997,7 @@ async def get_user_settings(from_user, stype="main"):
             )
             sd_msg = "Disabled"
         buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         tokenmsg = "Exists" if await aiopath.exists(token_pickle) else "Not Exists"
         if user_dict.get("GDRIVE_ID", False):
@@ -1082,7 +1084,7 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("Mirror Suffix", f"userset {user_id} menu MIRROR_SUFFIX")
         buttons.data_button("Mirror Name Swap", f"userset {user_id} menu MIRROR_NAME_SWAP")
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(2)
 
         text = f""" • <b>Rclone Config:</b> <b>{rccmsg}</b>
@@ -1114,7 +1116,7 @@ async def get_user_settings(from_user, stype="main"):
                 "🌐 Open Builder", f"userset {user_id} enc_web", "header"
             )
         buttons.data_button("Back", f"userset {user_id} back ffset", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         default_name = next(
             (n for n, s in specs.items() if s.get("is_default")), None
@@ -1182,7 +1184,7 @@ async def get_user_settings(from_user, stype="main"):
             buttons.data_button("Enable Merge Video", f"userset {user_id} tog MERGE_VIDEO t")
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(2)
 
         text = f"""<b>✦ FF MEDIA SETTINGS</b>
@@ -1242,7 +1244,7 @@ async def get_user_settings(from_user, stype="main"):
         )
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         btns = buttons.build_menu(1)
 
         text = f"""<b>✦ MISC SETTINGS</b>
@@ -1565,7 +1567,7 @@ async def get_menu(option, message, user_id):
     else:
         back_to = "back"
     buttons.data_button("Back", f"userset {user_id} {back_to}", "footer")
-    buttons.data_button("Close", f"userset {user_id} close", "footer")
+    buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
     val = user_dict.get(option)
     if option in file_dict and await aiopath.exists(file_dict[option]):
         val = "<b>Exists</b>"
@@ -1731,9 +1733,9 @@ async def edit_user_settings(client, query):
         buttons = ButtonMaker()
         if spec and not spec.get("is_default"):
             buttons.data_button("⭐ Set Default", f"userset {user_id} enc_def {name}")
-        buttons.data_button("✕ Delete", f"userset {user_id} enc_del {name}")
+        buttons.data_button("✕ Delete", f"userset {user_id} enc_del {name}", style=ButtonStyle.DANGER)
         buttons.data_button("Back", f"userset {user_id} back encode", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         v = spec.get("video_params") or {}
         a = spec.get("audio_params") or {}
@@ -1809,7 +1811,7 @@ async def edit_user_settings(client, query):
             )
 
         buttons.data_button("Back", f"userset {user_id} back uphoster", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         text = f"""<b>Select Uphoster Destinations:</b>"""
         await edit_message(message, text, buttons.build_menu(1))
@@ -1862,9 +1864,9 @@ async def edit_user_settings(client, query):
         await query.answer()
         buttons = ButtonMaker()
         text = user_settings_text[data[3]][2]
-        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop", style=ButtonStyle.DANGER)
         buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         prompt_title = data[3].replace("_", " ").title()
         new_message_text = f"<b>Set {prompt_title}</b>\n\n{text}"
         await edit_message(message, new_message_text, buttons.build_menu(1))
@@ -1892,7 +1894,7 @@ async def edit_user_settings(client, query):
                 )
         buttons.data_button("Add Dump", f"userset {user_id} ldump_add")
         buttons.data_button("Back", f"userset {user_id} back leech", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         if ldumps:
             dump_list = "\n".join([f" • <b>{name}</b>: <code>{chat}</code>" for name, chat in ldumps.items()])
@@ -1915,9 +1917,9 @@ async def edit_user_settings(client, query):
             return
         buttons = ButtonMaker()
         text = user_settings_text["LDUMP"][2]
-        buttons.data_button("Stop", f"userset {user_id} ldump_list stop")
+        buttons.data_button("Stop", f"userset {user_id} ldump_list stop", style=ButtonStyle.DANGER)
         buttons.data_button("Back", f"userset {user_id} ldump_list", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         await edit_message(message, f"<b>Add Custom Dumps</b>\n\n{text}", buttons.build_menu(1))
         rfunc = partial(update_user_settings, query, "leech")
         pfunc = partial(set_ldump, user_id=user_id, rfunc=rfunc)
@@ -1939,7 +1941,7 @@ async def edit_user_settings(client, query):
                 )
         buttons.data_button("Add Dump", f"userset {user_id} ldump_add")
         buttons.data_button("Back", f"userset {user_id} back leech", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         if ldumps:
             dump_list = "\n".join([f" • <b>{name}</b>: <code>{chat}</code>" for name, chat in ldumps.items()])
@@ -1970,7 +1972,7 @@ async def edit_user_settings(client, query):
                 )
         buttons.data_button("Add TD", f"userset {user_id} td_add")
         buttons.data_button("Back", f"userset {user_id} back gdrive", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         if user_tds:
             td_list = "\n".join([
@@ -1999,9 +2001,9 @@ async def edit_user_settings(client, query):
 
         buttons = ButtonMaker()
         text = user_settings_text["USER_TDS"][2]
-        buttons.data_button("Stop", f"userset {user_id} user_tds stop")
+        buttons.data_button("Stop", f"userset {user_id} user_tds stop", style=ButtonStyle.DANGER)
         buttons.data_button("Back", f"userset {user_id} user_tds", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         await edit_message(message, f"<b>Add User Team Drive</b>\n\n{text}", buttons.build_menu(1))
         rfunc = partial(update_user_settings, query, "gdrive")
         pfunc = partial(set_user_td, user_id=user_id, rfunc=rfunc)
@@ -2023,7 +2025,7 @@ async def edit_user_settings(client, query):
                 )
         buttons.data_button("Add TD", f"userset {user_id} td_add")
         buttons.data_button("Back", f"userset {user_id} back gdrive", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
 
         if user_tds:
             td_list = "\n".join([
@@ -2056,9 +2058,9 @@ async def edit_user_settings(client, query):
         elif data[2] == "rmone":
             text = f"Remove one or more key from {data[3]}. Example: key 1/key2/key 3. Timeout: 60 sec"
             func = remove_one
-        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop", style=ButtonStyle.DANGER)
         buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         await edit_message(
             message, message.text.html + "\n\n" + text, buttons.build_menu(1)
         )
@@ -2097,9 +2099,9 @@ async def edit_user_settings(client, query):
     elif data[2] == "confirm_reset_all":
         await query.answer()
         buttons = ButtonMaker()
-        buttons.data_button("Yes", f"userset {user_id} do_reset_all yes")
-        buttons.data_button("No", f"userset {user_id} do_reset_all no")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("Yes", f"userset {user_id} do_reset_all yes", style=ButtonStyle.SUCCESS)
+        buttons.data_button("No", f"userset {user_id} do_reset_all no", style=ButtonStyle.DANGER)
+        buttons.data_button("Close", f"userset {user_id} close", "footer", style=ButtonStyle.DANGER)
         text = "<i>Are you sure you want to reset all your user settings?</i>"
         await edit_message(query.message, text, buttons.build_menu(2))
     elif data[2] == "do_reset_all":

@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from html import escape
 from time import monotonic, time
 from uuid import uuid4
@@ -179,7 +180,7 @@ async def log(_, message):
     buttons = ButtonMaker()
     buttons.data_button("Log Disp", f"log {uid} disp")
     buttons.data_button("Web Log", f"log {uid} web")
-    buttons.data_button("Close", f"log {uid} close")
+    buttons.data_button("Close", f"log {uid} close", style=ButtonStyle.DANGER)
     await send_file(message, "log.txt", buttons=buttons.build_menu(2))
 
 
@@ -214,7 +215,7 @@ async def log_cb(_, query):
             text = f"<b>Showing Last {len(res)} Lines from log.txt:</b> \n\n----------<b>START LOG</b>----------\n\n<blockquote expandable>{escape('\n'.join(reversed(res)))}</blockquote>\n----------<b>END LOG</b>----------"
 
             btn = ButtonMaker()
-            btn.data_button("Close", f"log {user_id} close")
+            btn.data_button("Close", f"log {user_id} close", style=ButtonStyle.DANGER)
             await send_message(message, text, btn.build_menu(1))
             await edit_reply_markup(message, None)
         except Exception as err:

@@ -7,6 +7,7 @@
 #   • /link N  (batch: that message and the next N-1)
 #   • just send a file to the bot in PM (auto, opt-out per user)
 
+from pyrogram.enums import ButtonStyle
 from bot import LOGGER, user_data
 from bot.core.config_manager import Config
 from bot.core.tg_client import TgClient
@@ -130,8 +131,8 @@ async def _build_links(source_msg, title="Link Generated"):
 
     buttons = ButtonMaker()
     if streamable:
-        buttons.url_button("Watch", watch_url)
-    buttons.url_button("Download", download_url)
+        buttons.url_button("Watch", watch_url, style=ButtonStyle.PRIMARY)
+    buttons.url_button("Download", download_url, style=ButtonStyle.SUCCESS)
 
     text = (
         f"<blockquote><b>◈ {title}</b></blockquote>\n"

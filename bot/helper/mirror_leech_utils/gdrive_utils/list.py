@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from aiofiles.os import path as aiopath
 from asyncio import wait_for, Event, gather
 from functools import partial
@@ -205,7 +206,7 @@ class GoogleDriveList(GoogleDriveHelper):
             buttons.data_button("Back", "gdq back pa", position="footer")
         if len(self.parents) > 1:
             buttons.data_button("Back To Root", "gdq root", position="footer")
-        buttons.data_button("Cancel", "gdq cancel", position="footer")
+        buttons.data_button("Cancel", "gdq cancel", position="footer", style=ButtonStyle.DANGER)
         button = buttons.build_menu(f_cols=2)
         msg = "Choose Path:" + (
             "\nTransfer Type: <i>Download</i>"
@@ -268,7 +269,7 @@ class GoogleDriveList(GoogleDriveHelper):
             buttons = ButtonMaker()
             if self._token_user and self._token_owner:
                 buttons.data_button("Back", "gdq back dr", position="footer")
-            buttons.data_button("Cancel", "gdq cancel", position="footer")
+            buttons.data_button("Cancel", "gdq cancel", position="footer", style=ButtonStyle.DANGER)
             button = buttons.build_menu(2)
             await self._send_list_message(msg, button)
         elif self.use_sa and len(drives) == 1:
@@ -297,7 +298,7 @@ class GoogleDriveList(GoogleDriveHelper):
                 buttons.data_button(item["name"], f"gdq dr {index}")
             if self._token_user and self._token_owner:
                 buttons.data_button("Back", "gdq back dr", position="footer")
-            buttons.data_button("Cancel", "gdq cancel", position="footer")
+            buttons.data_button("Cancel", "gdq cancel", position="footer", style=ButtonStyle.DANGER)
             button = buttons.build_menu(2)
             await self._send_list_message(msg, button)
 
@@ -325,7 +326,7 @@ class GoogleDriveList(GoogleDriveHelper):
                 buttons.data_button("Service Accounts", "gdq sa")
             if self._token_user:
                 buttons.data_button("My Token", "gdq user")
-            buttons.data_button("Cancel", "gdq cancel")
+            buttons.data_button("Cancel", "gdq cancel", style=ButtonStyle.DANGER)
             button = buttons.build_menu(2)
             await self._send_list_message(msg, button)
         else:

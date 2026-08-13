@@ -73,7 +73,9 @@ from bot.helper.themes import BotTheme
 from bot.helper.telegram_helper.message_utils import (
     delete_message,
     delete_status,
+    premium_emoji,
     send_message,
+    send_premium_sticker,
     update_status_message,
 )
 
@@ -625,6 +627,8 @@ class TaskListener(TaskConfig):
         ):
             await database.rm_complete_task(self.message.link)
         msg = BotTheme("NAME", Name=escape(self.name))
+        if Config.IS_PREMIUM_BOT and Config.PREMIUM_EMOJI_ID:
+            msg = f"{premium_emoji('✨')} " + msg
         msg += BotTheme("SIZE", Size=get_readable_file_size(self.size))
         try:
             elapsed = time() - self.message.date.timestamp()
@@ -699,7 +703,7 @@ class TaskListener(TaskConfig):
                     not Config.DISABLE_DRIVE_LINK or self.user_id == Config.OWNER_ID
                 )
                 if link and show_drive_link:
-                    buttons.url_button("☁️ Cloud Link", link)
+                    buttons.url_button("☁️ Cloud Link", link, premium_icon=True)
                 elif multi_links:
                     for name, url in multi_links:
                         buttons.url_button(name, url)
@@ -770,6 +774,7 @@ class TaskListener(TaskConfig):
             await send_message(self.message, group_msg, button)
 
         await self._send_mega_skipped_breakdown()
+        await send_premium_sticker(self.message)
 
         if self.seed:
             await clean_target(self.up_dir)

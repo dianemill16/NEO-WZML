@@ -8,6 +8,11 @@ class Config:
     AS_DOCUMENT = False
     AUTHORIZED_CHATS = ""
     BUTTON_STYLE = "none"  # inline button accent: see BUTTON_STYLES
+    COLORED_BTNS = False  # use wzgram's real button colors (PRIMARY/DANGER/SUCCESS) on call sites that pass style=; overrides BUTTON_STYLE's emoji accent on those buttons only
+    IS_PREMIUM_USER = False  # mirrors TgClient.IS_PREMIUM_USER for display in /bsetting — re-detected and overwritten every time USER_SESSION_STRING (re)connects, so editing it here has no lasting effect
+    IS_PREMIUM_BOT = False  # mirrors TgClient.IS_PREMIUM_BOT — whether BOT_TOKEN's own account has Telegram Premium. Re-detected on every bot startup; editing it here has no lasting effect. Gates PREMIUM_EMOJI_ID / PREMIUM_TASK_STICKER below
+    PREMIUM_EMOJI_ID = ""  # custom emoji document ID (forward a message using it to @idstickerbot-style JSON tools to find one). Only renders as a real custom emoji when IS_PREMIUM_BOT is True — Telegram requires the sending bot to be Premium-linked for custom_emoji entities and icon_custom_emoji_id buttons, otherwise the plain fallback glyph is used
+    PREMIUM_TASK_STICKER = ""  # sticker file_id sent after a completed task, only when IS_PREMIUM_BOT is True. Get a file_id by sending the sticker to the bot and checking its logs, or via @RawDataBot
     EXCEP_CHATS = ""
     BOT_THEME = "ultra"
     BASE_URL = ""
@@ -131,6 +136,7 @@ class Config:
     STOP_DUPLICATE = False
     STRICT_AUTH_MODE = False  # owner/sudo/explicit only
     STRICT_FILE_MODE = False  # videos >= 100MB only
+    GDRIVE_STREAM_LEECH = False  # GDrive folder leech: download 1 file, upload it, delete it, repeat — instead of downloading the whole folder to disk first
     STREAMWISH_API = ""
     SUDO_USERS = ""
     TELEGRAM_API = 0

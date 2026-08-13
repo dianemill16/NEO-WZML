@@ -20,8 +20,17 @@ class TgClient:
 
     BNAME = ""
     ID = 0
+    IS_PREMIUM_BOT = False
     IS_PREMIUM_USER = False
     MAX_SPLIT_SIZE = 2097152000
+
+    @classmethod
+    def _set_premium(cls, value):
+        """Set IS_PREMIUM_USER and mirror it onto Config.IS_PREMIUM_USER so
+        /bsetting shows the real, current detection result without anyone
+        having to look at logs or touch a setting by hand."""
+        cls.IS_PREMIUM_USER = value
+        Config.IS_PREMIUM_USER = value
 
     @classmethod
     def neoTgClient(cls, *args, max_concurrent_transmissions=3, **kwargs):
@@ -80,6 +89,20 @@ class TgClient:
         await cls.bot.start()
         cls.BNAME = cls.bot.me.username
         cls.ID = Config.BOT_TOKEN.split(":", 1)[0]
+        # Bots can inherit Telegram Premium when linked to a premium
+        # account. Gates the premium-only visual extras (custom emoji in
+        # text/buttons, task-complete sticker — see Config.PREMIUM_EMOJI_ID
+        # / PREMIUM_TASK_STICKER): Telegram rejects custom_emoji entities
+        # and icon_custom_emoji_id from non-premium bots, so this has to be
+        # checked before ever using them.
+        try:
+            is_premium = bool(getattr(cls.bot.me, "is_premium", False))
+            cls.IS_PREMIUM_BOT = is_premium
+            Config.IS_PREMIUM_BOT = is_premium
+        except Exception as e:
+            LOGGER.warning(f"Could not detect bot premium status: {e}")
+            cls.IS_PREMIUM_BOT = False
+            Config.IS_PREMIUM_BOT = False
         LOGGER.info(f"NEO-WZML Bot : [@{cls.BNAME}] Started!")
 
     @classmethod
@@ -93,7 +116,7 @@ class TgClient:
                     decrypt_key = cls._get_decrypt_key()
                     if decrypt_key is None:
                         LOGGER.error("No decryption key provided for USER_SESSION_STRING")
-                        cls.IS_PREMIUM_USER = False
+                        cls._set_premium(False)
                         cls.user = None
                         return
 
@@ -104,7 +127,7 @@ class TgClient:
                         LOGGER.info("Successfully decrypted USER_SESSION_STRING")
                     except InvalidToken:
                         LOGGER.error("Failed to decrypt USER_SESSION_STRING - Invalid key")
-                        cls.IS_PREMIUM_USER = False
+                        cls._set_premium(False)
                         cls.user = None
                         return
 
@@ -113,16 +136,24 @@ class TgClient:
                     session_string=session_string,
                     sleep_threshold=60,
                     no_updates=True,
+                    # Without this, cls.user silently falls back to
+                    # neoTgClient's default of 3 concurrent transmission
+                    # streams — capping a single upload's throughput
+                    # regardless of how much bandwidth the VPS or a
+                    # Premium account's higher flood-control allowance
+                    # could otherwise sustain. Match helper bots' setting
+                    # so a premium USER_SESSION_STRING actually benefits.
+                    max_concurrent_transmissions=Config.HYPER_THREADS or 8,
                 )
                 await cls.user.start()
-                cls.IS_PREMIUM_USER = cls.user.me.is_premium
+                cls._set_premium(cls.user.me.is_premium)
                 if cls.IS_PREMIUM_USER:
                     cls.MAX_SPLIT_SIZE = 4194304000
                 uname = cls.user.me.username or cls.user.me.first_name
                 LOGGER.info(f"NEO-WZML User : [{uname}] Started!")
             except Exception as e:
                 LOGGER.error(f"Failed to start client from USER_SESSION_STRING. {e}")
-                cls.IS_PREMIUM_USER = False
+                cls._set_premium(False)
                 cls.user = None
 
     @classmethod

@@ -194,6 +194,7 @@ to your cloud, to Telegram, or to a streaming link.</i>
     STA_MODE = "\n┃ <b>Mode:</b> {Mode}"
     SEEDERS = "\n┃ <b>Seeders:</b> {Seeders} · "
     LEECHERS = "<b>Leechers:</b> {Leechers}"
+    FILES_PROGRESS = "\n┃ <b>Files:</b> {Files}"
 
     SEED_SIZE = "\n┃ <b>Size:</b> {Size}"
     SEED_SPEED = "\n┃ <b>Speed:</b> {Speed} · "

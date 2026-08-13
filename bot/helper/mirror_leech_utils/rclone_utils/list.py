@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from asyncio import wait_for, Event, gather
@@ -236,7 +237,7 @@ class RcloneList:
             buttons.data_button("Back", "rcq back pa", position="footer")
         if self.path:
             buttons.data_button("Back To Root", "rcq root", position="footer")
-        buttons.data_button("Cancel", "rcq cancel", position="footer")
+        buttons.data_button("Cancel", "rcq cancel", position="footer", style=ButtonStyle.DANGER)
         button = buttons.build_menu(f_cols=2)
         msg = "Choose Path:" + (
             "\nTransfer Type: <i>Download</i>"
@@ -325,7 +326,7 @@ class RcloneList:
                 buttons.data_button(remote, f"rcq re {remote}:")
             if self._rc_user and self._rc_owner:
                 buttons.data_button("Back", "rcq back re", position="footer")
-            buttons.data_button("Cancel", "rcq cancel", position="footer")
+            buttons.data_button("Cancel", "rcq cancel", position="footer", style=ButtonStyle.DANGER)
             button = buttons.build_menu(2)
             await self._send_list_message(msg, button)
 
@@ -342,7 +343,7 @@ class RcloneList:
             buttons = ButtonMaker()
             buttons.data_button("Owner Config", "rcq owner")
             buttons.data_button("My Config", "rcq user")
-            buttons.data_button("Cancel", "rcq cancel")
+            buttons.data_button("Cancel", "rcq cancel", style=ButtonStyle.DANGER)
             button = buttons.build_menu(2)
             await self._send_list_message(msg, button)
         else:

@@ -11,6 +11,7 @@ from re import findall as re_findall
 from aiofiles import open as aiopen
 from aiofiles.os import listdir, makedirs, path as aiopath
 from contextlib import suppress
+from os import path as ospath
 
 from bot.core.config_manager import Config, BinConfig
 from bot.helper.ext_utils.bot_utils import cmd_exec, sync_to_async

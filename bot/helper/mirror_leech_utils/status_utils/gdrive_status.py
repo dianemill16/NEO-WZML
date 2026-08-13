@@ -39,7 +39,12 @@ class GoogleDriveStatus:
 
     def progress_raw(self):
         try:
-            return self._obj.processed_bytes / self._size * 100
+            # Clamp to 100: processed_bytes can momentarily read higher than
+            # the counted total size (e.g. a stale progress tick during a
+            # multi-file folder transfer, or Drive's reported size differing
+            # slightly from actual bytes written). Displaying >100% is never
+            # correct, so cap it here as a safety net regardless of cause.
+            return min(self._obj.processed_bytes / self._size * 100, 100)
         except ZeroDivisionError:
             return 0
 
@@ -51,10 +56,25 @@ class GoogleDriveStatus:
 
     def eta(self):
         try:
-            seconds = (self._size - self._obj.processed_bytes) / self._obj.speed
-            return get_readable_time(seconds)
+            remaining = self._size - self._obj.processed_bytes
+            if remaining <= 0 or self._obj.speed <= 0:
+                return "-"
+            return get_readable_time(remaining / self._obj.speed)
         except Exception:
             return "-"
+
+    def files_progress(self):
+        # Only present for a GDrive-folder streaming leech (see
+        # GoogleDriveDownload._download_folder_streaming), which sets these
+        # two attributes on the listener as it works through the folder one
+        # file at a time. Absent for a normal file/folder task, so
+        # get_readable_message()'s hasattr(task, "files_progress") check
+        # skips this line for everything else.
+        total = getattr(self.listener, "stream_total_files", None)
+        if not total:
+            return None
+        done = getattr(self.listener, "stream_done_files", 0)
+        return f"{done}/{total}"
 
     def task(self):
         return self._obj

@@ -166,6 +166,10 @@ class TaskConfig:
         self.seed = False
         self.join = False
         self.merge_video = False
+        self.stream_leech = False
+        self.stream_total_files = 0
+        self.stream_done_files = 0
+        self._stream_leech_handled = False
         self.private_link = False
         self.stop_duplicate = False
         self.sample_video = False
@@ -607,11 +611,10 @@ class TaskConfig:
                     self.split_size = int(self.split_size)
                 else:
                     self.split_size = get_size_bytes(self.split_size)
-            self.split_size = (
-                self.split_size
-                or self.user_dict.get("LEECH_SPLIT_SIZE")
-                or Config.LEECH_SPLIT_SIZE
+            explicit_split_size = self.split_size or self.user_dict.get(
+                "LEECH_SPLIT_SIZE"
             )
+            self.split_size = explicit_split_size or Config.LEECH_SPLIT_SIZE
             self.equal_splits = (
                 self.user_dict.get("EQUAL_SPLITS")
                 or Config.EQUAL_SPLITS
@@ -620,7 +623,21 @@ class TaskConfig:
             self.max_split_size = (
                 TgClient.MAX_SPLIT_SIZE if TgClient.IS_PREMIUM_USER else 2097152000
             )
-            self.split_size = min(self.split_size, self.max_split_size)
+            # Auto-follow Telegram Premium: nobody set a split size for this
+            # task or this user, and the admin never touched LEECH_SPLIT_SIZE
+            # away from its stock 2GB default — so there's no explicit choice
+            # to respect. In that case a premium USER_SESSION_STRING should
+            # raise the effective split size on its own; an explicit -sp flag,
+            # per-user LEECH_SPLIT_SIZE, or a customized global default always
+            # wins and just gets clamped to the premium ceiling as before.
+            if (
+                not explicit_split_size
+                and Config.LEECH_SPLIT_SIZE == 2097152000
+                and TgClient.IS_PREMIUM_USER
+            ):
+                self.split_size = self.max_split_size
+            else:
+                self.split_size = min(self.split_size, self.max_split_size)
 
             if not self.as_doc:
                 self.as_doc = (

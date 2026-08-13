@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from asyncio import (
     CancelledError,
     create_subprocess_exec,
@@ -73,7 +74,7 @@ def _build_command_usage(help_dict, command_key):
                 buttons.data_button(BotTheme("PREVIOUS"), f"help pre {command_key} {i - 1}")
             if i < len(cmd_pages) - 1:
                 buttons.data_button(BotTheme("NEXT"), f"help nex {command_key} {i + 1}")
-        buttons.data_button("Close", "help close", "footer")
+        buttons.data_button("Close", "help close", "footer", style=ButtonStyle.DANGER)
         temp_store.append(buttons.build_menu(2))
         buttons.reset()
 
@@ -161,7 +162,7 @@ def bt_selection_buttons(id_):
             "Select Files", f"{base_url}/app/files?gid={id_}&pin={pin}"
         )
     buttons.data_button("Done Selecting", f"sel done {gid} {id_}")
-    buttons.data_button("Cancel", f"sel cancel {gid}")
+    buttons.data_button("Cancel", f"sel cancel {gid}", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -180,7 +181,7 @@ def mega_selection_buttons(gid):
             f"{base_url}/app/files?gid={gid}&pin={pin}&type=mega",
         )
     buttons.data_button("Done Selecting", f"sel done {gid} {gid}")
-    buttons.data_button("Cancel", f"sel cancel {gid}")
+    buttons.data_button("Cancel", f"sel cancel {gid}", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -199,7 +200,7 @@ def terabox_selection_buttons(gid):
             f"{base_url}/app/files?gid={gid}&pin={pin}&type=terabox",
         )
     buttons.data_button("Done Selecting", f"sel done {gid} {gid}")
-    buttons.data_button("Cancel", f"sel cancel {gid}")
+    buttons.data_button("Cancel", f"sel cancel {gid}", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -218,7 +219,7 @@ def rclone_selection_buttons(gid):
             f"{base_url}/app/files?gid={gid}&pin={pin}&type=rclone",
         )
     buttons.data_button("Done Selecting", f"sel done {gid} {gid}")
-    buttons.data_button("Cancel", f"sel cancel {gid}")
+    buttons.data_button("Cancel", f"sel cancel {gid}", style=ButtonStyle.DANGER)
     return buttons.build_menu(2)
 
 
@@ -269,6 +270,7 @@ def arg_parser(items, arg_base):
         "-bt",
         "-yt",
         "-mv",
+        "-sl",
     }
     if Config.DISABLE_BULK and "-b" in items:
         arg_base["-b"] = False

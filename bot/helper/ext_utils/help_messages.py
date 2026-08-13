@@ -1103,7 +1103,11 @@ config_descriptions = {
     "RCLONE_SERVE_PASS": "Password for Rclone serve HTTP authentication",
 
     "AS_DOCUMENT": "Upload files as documents instead of streamable media",
-    "LEECH_SPLIT_SIZE": "Maximum file size before splitting (in bytes)",
+    "LEECH_SPLIT_SIZE": "Maximum file size before splitting (in bytes). Left at the default 2GB, this auto-raises to 4GB whenever a premium USER_SESSION_STRING is connected (see IS_PREMIUM_USER) — set it explicitly to override that.",
+    "IS_PREMIUM_USER": "Read-only: whether USER_SESSION_STRING is currently logged in as a Telegram Premium account. Re-detected on every login — changing it here has no lasting effect.",
+    "IS_PREMIUM_BOT": "Read-only: whether BOT_TOKEN's own account has Telegram Premium attached. Re-detected on every bot startup — changing it here has no lasting effect. Required for PREMIUM_EMOJI_ID and PREMIUM_TASK_STICKER to actually render/send.",
+    "PREMIUM_EMOJI_ID": "Custom emoji document ID used as a small icon in task-complete messages/buttons. Only takes effect when IS_PREMIUM_BOT is True — Telegram rejects custom emoji from non-premium bots.",
+    "PREMIUM_TASK_STICKER": "Sticker file_id sent after a task finishes. Only takes effect when IS_PREMIUM_BOT is True.",
     "EQUAL_SPLITS": "Split files into equal-sized parts instead of max-size parts",
     "MEDIA_GROUP": "Group split file parts as media album in Telegram",
     "LEECH_PREFIX": "Text added BEFORE every leeched filename",
@@ -1230,7 +1234,7 @@ config_descriptions = {
     "SET_COMMANDS": "Automatically set bot commands in Telegram on startup",
     "CMD_SUFFIX": "Suffix added to all bot commands. Useful for multi-instance",
 
-    "HYPER_THREADS": "Parallel transfer threads per helper client for Hyper download/upload. 0 = auto-detect",
+    "HYPER_THREADS": "Parallel transfer streams per client for Hyper download/upload, and now also for the USER_SESSION_STRING client's own uploads (previously stuck at 3 regardless of this setting). 0 = auto-detect (8). A Telegram Premium session can sustain far more parallel streams than a free account before Telegram's flood control pushes back — raising this (e.g. 16-32+) on a premium session is what actually unlocks higher combined upload throughput; the ceiling in practice is your VPS's own upload bandwidth.",
     "ARIA2_MAX_DL_SPEED": "Cap aria2's total download speed, e.g. 80M. Prevents VPS freeze on fast mirrors. Empty = unlimited",
     "HYDRA_IP": "Hydra download accelerator server IP. Leave empty if not using Hydra",
     "HYDRA_API_KEY": "API key for Hydra download accelerator authentication",

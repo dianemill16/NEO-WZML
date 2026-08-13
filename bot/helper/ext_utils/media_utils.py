@@ -942,6 +942,22 @@ class FFMpeg:
         multi_streams = True
         self._total_time = duration = (await get_media_info(f_path))[0]
         base_name, extension = ospath.splitext(file_)
+        if not extension or re.fullmatch(r"\.\d+", extension):
+            # file_ is itself already a previously-split part (e.g. an
+            # earlier "...mkv.001" re-downloaded and leeched again) or has
+            # no real extension at all. Plain ospath.splitext() would treat
+            # that trailing numeric suffix as the "extension", producing an
+            # output path like "name.mkv.part001.001" — ffmpeg can't infer
+            # a container format from ".001" and fails with "Unable to
+            # choose an output format", silently falling back to an
+            # unsplit upload (fine under the split-size cap, a hard
+            # failure above it). Strip the numeric suffix and re-derive
+            # from what's left, falling back to .mkv if that still doesn't
+            # yield a usable extension.
+            stripped = re.sub(r"\.\d+$", "", file_)
+            base_name, extension = ospath.splitext(stripped)
+            if not extension:
+                extension = ".mkv"
         split_size -= 3000000
         start_time = 0
         i = 1

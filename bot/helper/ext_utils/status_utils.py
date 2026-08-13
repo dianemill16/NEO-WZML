@@ -303,6 +303,14 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             msg += BotTheme("ELAPSED", Elapsed=get_readable_time(elapsed))
             msg += BotTheme("ENGINE", Engine=task.engine)
             msg += BotTheme("STA_MODE", Mode=f"{task.listener.mode[0]} - {task.listener.mode[1]}")
+            # Only set on GDrive folder streaming-leech tasks (see
+            # GoogleDriveStatus.files_progress) — a "no. of files done/total"
+            # counter for the download-one/upload-one/delete-one flow, kept
+            # separate from the normal byte progress bar above.
+            if hasattr(task, "files_progress"):
+                fp = task.files_progress()
+                if fp:
+                    msg += BotTheme("FILES_PROGRESS", Files=fp)
             if task.engine.startswith("qBit") and hasattr(task, "seeders_num"):
                 try:
                     msg += BotTheme("SEEDERS", Seeders=task.seeders_num())

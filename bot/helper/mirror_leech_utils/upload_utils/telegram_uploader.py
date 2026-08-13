@@ -540,11 +540,9 @@ class TelegramUploader:
             )
 
     async def upload(self):
-        await self._user_settings()
-        res = await self._msg_to_reply()
-        if not res:
+        started = await self._start_session()
+        if not started:
             return
-        self._is_log_del = False
         items = []
         for dirpath, _, files in natsorted(await sync_to_async(walk, self._path)):
             if dirpath.strip().endswith("/yt-dlp-thumb"):
@@ -563,6 +561,34 @@ class TelegramUploader:
             await self._hyper_pipeline(items)
         else:
             await self._upload_items(items)
+        await self._finish_session()
+
+    async def _start_session(self):
+        """Set up the reply message and per-run counters. Shared by the
+        normal one-shot upload() and the GDrive folder streaming leech
+        (GoogleDriveDownload._download_folder_streaming), which calls this
+        once up front and then feeds files in one at a time via
+        upload_single() instead of walking self._path."""
+        await self._user_settings()
+        res = await self._msg_to_reply()
+        if not res:
+            return False
+        self._is_log_del = False
+        return True
+
+    async def upload_single(self, dirpath, file_):
+        """Upload exactly one (dirpath, file_) pair. _upload_items() already
+        deletes the file from disk right after a successful send (or on an
+        unrecoverable per-file error), so callers that invoke this once per
+        downloaded file naturally get download-one/upload-one/delete-one
+        behavior with no extra cleanup step needed here."""
+        await self._upload_items([(dirpath, file_)])
+
+    async def _finish_session(self):
+        """Flush any pending media groups and send the single final
+        completion/error message for the whole task. Shared tail of
+        upload() and of the streaming leech path, so a multi-file GDrive
+        folder still gets exactly one summary message, not one per file."""
         if self._listener.is_cancelled:
             return
         for key, value in list(self._media_dict.items()):

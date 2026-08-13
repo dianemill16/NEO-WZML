@@ -1,5 +1,6 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram.enums import ButtonStyle
 from asyncio import sleep, gather
 from re import match as re_match
 from time import time
@@ -33,6 +34,33 @@ from bot.core.tg_client import TgClient
 from bot.helper.ext_utils.bot_utils import SetInterval
 from bot.helper.ext_utils.exceptions import TgLinkException
 from bot.helper.ext_utils.status_utils import get_readable_message
+
+
+def premium_emoji(fallback):
+    """Wraps `fallback` (a plain emoji/glyph) in a <tg-emoji> custom-emoji
+    entity when Config.IS_PREMIUM_BOT and PREMIUM_EMOJI_ID are both set.
+    Telegram only renders custom_emoji entities for bots that have Premium
+    attached — sending this tag from a non-premium bot either gets
+    rejected or just shows the fallback text — so this stays plain
+    (returns `fallback` unchanged) unless both conditions hold.
+    """
+    if Config.IS_PREMIUM_BOT and Config.PREMIUM_EMOJI_ID:
+        return f'<tg-emoji emoji-id="{Config.PREMIUM_EMOJI_ID}">{fallback}</tg-emoji>'
+    return fallback
+
+
+async def send_premium_sticker(message):
+    """Sends Config.PREMIUM_TASK_STICKER to the chat a task message came
+    from, only when Config.IS_PREMIUM_BOT is True and a sticker is set.
+    Best-effort: a bad/expired file_id or missing chat access shouldn't
+    break the task-complete flow that calls this, so failures are logged
+    and swallowed rather than raised."""
+    if not (Config.IS_PREMIUM_BOT and Config.PREMIUM_TASK_STICKER):
+        return
+    try:
+        await TgClient.bot.send_sticker(message.chat.id, Config.PREMIUM_TASK_STICKER)
+    except Exception as e:
+        LOGGER.warning(f"Could not send premium task sticker: {e}")
 
 
 async def send_message(message, text, buttons=None, block=True, photo=None, _recursion_depth=0, **kwargs):
@@ -466,7 +494,7 @@ async def open_dump_btns(message):
         )
 
     buttons.data_button("Select All", f"dcat {user_id} {msg_id} All", "header")
-    buttons.data_button("Cancel", f"dcat {user_id} {msg_id} dcancel", "footer")
+    buttons.data_button("Cancel", f"dcat {user_id} {msg_id} dcancel", "footer", style=ButtonStyle.DANGER)
     buttons.data_button("Done (60)", f"dcat {user_id} {msg_id} ddone", "footer")
 
     prompt = await send_message(

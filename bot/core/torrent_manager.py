@@ -152,7 +152,18 @@ class TorrentManager:
             except Exception as e:
                 LOGGER.error(e)
         if key not in ["checksum", "index-out", "out", "pause", "select-file"]:
-            await cls.aria2.changeGlobalOption({key: value})
+            try:
+                await cls.aria2.changeGlobalOption({key: value})
+            except Exception as e:
+                # aria2 validates each option server-side and rejects
+                # values it doesn't like (e.g. empty string for a numeric
+                # limit) with an RPC error, not a client-side check we can
+                # pre-empt for every possible key. Without this, that
+                # surfaces as an unhandled "Task exception was never
+                # retrieved" crash from /bsetting instead of a clean
+                # in-chat error — log it and keep going.
+                LOGGER.error(f"aria2 rejected option {key}={value!r}: {e}")
+                return
             aria2_options[key] = value
 
 

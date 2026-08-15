@@ -85,6 +85,14 @@ class TgClient:
             f"NEO-WZML-Bot{cls.ID}",
             bot_token=Config.BOT_TOKEN,
             workdir="/usr/src/app",
+            # Same gap as the user session fix above: without this,
+            # cls.bot silently falls back to neoTgClient's factory default
+            # of 3 concurrent transmission streams. This is the client
+            # that handles every upload under 2GB (i.e. most leeches) —
+            # leaving it uncapped-in-name-only at 3 meant the majority of
+            # uploads were bottlenecked here regardless of HYPER_THREADS,
+            # premium session, or anything else being tuned.
+            max_concurrent_transmissions=Config.HYPER_THREADS or 8,
         )
         await cls.bot.start()
         cls.BNAME = cls.bot.me.username

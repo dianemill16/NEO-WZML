@@ -805,10 +805,27 @@ async def edit_bot_settings(client, query):
     elif data[1] == "emptyaria":
         handler_dict[chat_id] = False
         await query.answer()
-        aria2_options[data[2]] = ""
+        # aria2's changeGlobalOption rejects an empty string for these
+        # numeric options (confirmed in logs: "We encountered a problem
+        # while processing the option '--max-overall-download-limit'"
+        # etc.) — an unhandled Aria2rpcException on every attempt to
+        # "reset" one of them, permanently stuck at whatever value was
+        # last set with no way to clear it from /bsetting. "0" is aria2's
+        # own built-in default for the speed limits (meaning unlimited);
+        # "1" is its default for max-connection-per-server (0 isn't a
+        # legal value there).
+        ARIA2_EMPTY_RESET_VALUE = {
+            "max-overall-download-limit": "0",
+            "max-download-limit": "0",
+            "max-overall-upload-limit": "0",
+            "max-upload-limit": "0",
+            "max-connection-per-server": "1",
+        }
+        reset_value = ARIA2_EMPTY_RESET_VALUE.get(data[2], "")
+        aria2_options[data[2]] = reset_value
         await update_buttons(message, "aria")
-        await TorrentManager.change_aria2_option(data[2], "")
-        await database.update_aria2(data[2], "")
+        await TorrentManager.change_aria2_option(data[2], reset_value)
+        await database.update_aria2(data[2], reset_value)
     elif data[1] == "emptyqbit":
         handler_dict[chat_id] = False
         await query.answer()

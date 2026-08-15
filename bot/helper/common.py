@@ -1385,7 +1385,19 @@ class TaskConfig:
                     res = await split_file(f_path, split_size, self)
                 if self.is_cancelled:
                     return False
-                if res or f_size >= self.max_split_size:
+                if res:
+                    # Only remove the original once its replacement split
+                    # parts genuinely exist and are complete — see the
+                    # split() fix above. This used to also delete the
+                    # original whenever f_size >= self.max_split_size even
+                    # on a FAILED split (res == False) — for exactly the
+                    # oversized files that most need splitting to work,
+                    # that meant: split fails, original gets deleted
+                    # anyway, and nothing usable is left behind at all.
+                    # Leaving the original in place on failure lets the
+                    # upload-time size guard (telegram_uploader.py) at
+                    # least stop that one file with a clear error instead
+                    # of silently losing it.
                     try:
                         await remove(f_path)
                     except Exception:

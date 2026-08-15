@@ -58,6 +58,23 @@ except Exception:
     # the web UI (torrent/file selection) must still come up
     pass
 
+try:
+    from asyncio import run as _asyncio_run
+    from web.mongo import load_db_config as _load_db_config
+
+    # Config.load() above only reads env vars / config.py. Anything
+    # changed at runtime through the bot's /bsetting (BASE_URL included)
+    # is persisted to MongoDB and only applied to the *bot* process's
+    # in-memory Config there — this separate gunicorn process never saw
+    # it, so it kept using whatever the environment had at container
+    # deploy time regardless of what got set later. Pull the current
+    # DB-persisted values in too, the same source of truth the main bot
+    # uses, so a BASE_URL (or any other) change here is actually live
+    # the next time gunicorn is restarted for it.
+    _asyncio_run(_load_db_config())
+except Exception as _e:
+    getLogger(__name__).warning(f"Could not load DB-persisted config in web process: {_e}")
+
 getLogger("httpx").setLevel(WARNING)
 getLogger("aiohttp").setLevel(WARNING)
 

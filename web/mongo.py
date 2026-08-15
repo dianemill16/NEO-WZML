@@ -34,6 +34,39 @@ def users_collection():
     return _client.neowzml.users[bot_id]
 
 
+async def load_db_config():
+    """Pulls the current MongoDB-persisted config (the same values
+    /bsetting writes and bot/core/startup.py loads for the main bot
+    process) and applies it via Config.load_dict(). The web server runs
+    as its own gunicorn process with its own Config.load() call (env vars
+    / config.py only) — without this, anything changed through the bot's
+    settings UI at runtime (BASE_URL included) never reaches this
+    process, so it keeps using whatever value was baked in at container
+    deploy time no matter what the operator sets later.
+
+    Uses its own throwaway client rather than config_collection()'s
+    shared one: this runs once at import time under a transient
+    asyncio.run() loop, before uvicorn's real long-lived loop exists —
+    caching a client bound to that transient loop would break every
+    later request-time use of the shared client with a
+    "attached to a different loop" error.
+    """
+    if not Config.DATABASE_URL:
+        return
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    client = AsyncIOMotorClient(Config.DATABASE_URL)
+    try:
+        bot_id = (Config.BOT_TOKEN or ":").split(":", 1)[0]
+        config_dict = await client.neowzml.settings.config.find_one(
+            {"_id": bot_id}, {"_id": 0}
+        )
+        if config_dict:
+            Config.load_dict(config_dict)
+    finally:
+        client.close()
+
+
 def close():
     global _client, _uri
     if _client is not None:

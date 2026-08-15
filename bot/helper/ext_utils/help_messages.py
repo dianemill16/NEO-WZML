@@ -1234,7 +1234,7 @@ config_descriptions = {
     "SET_COMMANDS": "Automatically set bot commands in Telegram on startup",
     "CMD_SUFFIX": "Suffix added to all bot commands. Useful for multi-instance",
 
-    "HYPER_THREADS": "Parallel transfer streams per client for Hyper download/upload, and now also for the USER_SESSION_STRING client's own uploads (previously stuck at 3 regardless of this setting). 0 = auto-detect (8). A Telegram Premium session can sustain far more parallel streams than a free account before Telegram's flood control pushes back — raising this (e.g. 16-32+) on a premium session is what actually unlocks higher combined upload throughput; the ceiling in practice is your VPS's own upload bandwidth.",
+    "HYPER_THREADS": "Parallel transfer streams for every Telegram client this bot runs — BOT_TOKEN, USER_SESSION_STRING, and each helper bot (all were previously stuck at a factory default of 3, regardless of this setting, unless a client explicitly overrode it). 0 = auto-detect (8). A Telegram Premium session can sustain far more parallel streams than a free account before Telegram's flood control pushes back — raising this (e.g. 16-32+) is what actually unlocks higher combined upload throughput; the ceiling in practice is your VPS's own upload bandwidth. Watch for FLOOD_WAIT_X warnings in logs if you push it too high — that's the real ceiling for your account, not a bug.",
     "ARIA2_MAX_DL_SPEED": "Cap aria2's total download speed, e.g. 80M. Prevents VPS freeze on fast mirrors. Empty = unlimited",
     "HYDRA_IP": "Hydra download accelerator server IP. Leave empty if not using Hydra",
     "HYDRA_API_KEY": "API key for Hydra download accelerator authentication",

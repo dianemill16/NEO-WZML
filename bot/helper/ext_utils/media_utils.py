@@ -1040,15 +1040,31 @@ class FFMpeg:
                 LOGGER.error(
                     f"Something went wrong while splitting, mostly file is corrupted. Path: {f_path}"
                 )
-                break
+                # Was falling through to the unconditional `return True`
+                # below — reporting success on a corrupted output part.
+                # proceed_split() (bot/helper/common.py) treats a truthy
+                # return as "split succeeded" and deletes the original
+                # file, so this silently destroyed the only good copy and
+                # left a corrupted partial upload in its place. Fail
+                # explicitly instead.
+                return False
             elif duration == lpd:
                 LOGGER.warning(
                     f"This file has been splitted with default stream and audio, so you will only see one part with less size from orginal one because it doesn't have all streams and audios. This happens mostly with MKV videos. Path: {f_path}"
                 )
-                break
+                # Same issue as above: this is a known-degraded single
+                # part (missing streams/audio), not a real split — don't
+                # report success and get the original deleted out from
+                # under it.
+                return False
             elif lpd <= 3:
                 await remove(out_path)
-                break
+                # A near-empty part this early only means something went
+                # wrong with this attempt, not that splitting legitimately
+                # finished (the loop's own `while` condition is what ends
+                # things normally, not this branch) — don't fall through
+                # to `return True` and get the original deleted.
+                return False
             self._last_processed_time += lpd
             self._last_processed_bytes += out_size
             start_time += lpd - 3

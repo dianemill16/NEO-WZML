@@ -112,8 +112,20 @@ MIRROR_LOG_ID = ""
 AUTHOR_NAME = ""
 AUTHOR_URL = ""
 
-# Hyper TG (helper bot tokens, comma-separated)
+# Hyper TG (helper bot tokens, space-separated)
 HELPER_TOKENS = ""
+# Use HELPER_TOKENS bots for accelerated (multi-client) Telegram
+# download AND upload. Requires HELPER_TOKENS and LEECH_DUMP_CHAT
+# (helper bots must be admin there). Files are always sent in
+# series (natural sort order), so episodes and split parts keep
+# their sequence.
+USE_HYPER = False
+# Parallel transfer threads per helper client. 0 = auto
+HYPER_THREADS = 0
+
+# Cap aria2's aggregate download rate (e.g. "80M") so a fast mirror
+# can't saturate the VPS disk/NIC and freeze the machine. Empty = unlimited
+ARIA2_MAX_DL_SPEED = ""
 
 # Mega
 MEGA_EMAIL = ""
@@ -197,3 +209,37 @@ UPSTREAM_BRANCH = "master"
 AUTO_UPDATE = False
 UPDATE_PKGS = True
 UPGRADE_PACKAGES = False
+
+# ── NEO-WZML ULTRA ──────────────────────────────────────────────
+# Inline button accent: none | blue | red | green | purple | orange
+# | yellow | diamond | star | arrow | bracket  (set via /bsetting)
+BUTTON_STYLE = "none"
+
+# Advanced auto-rename template applied to every uploaded file.
+# Placeholders: {title} {season} {episode} {quality} {year}
+# ({season_raw}/{episode_raw} = unpadded). Per-user via /autorename.
+# Example: "[MyGroup] {title} - S{season}E{episode} [{quality}]"
+AUTO_RENAME = ""
+
+# FileToLink streaming gateway (/link, /stream, /f2l).
+# Needs BASE_URL; files are stored in FILETOLINK_CHAT (bot must be
+# admin there) and fall back to LEECH_DUMP_CHAT when unset.
+FILETOLINK_ENABLED = False
+FILETOLINK_CHAT = ""
+
+# Chat response theme: "ultra" (default, matches the ULTRA web UI),
+# "minimal" (previous look), "random", or any bot/helper/themes/neo_*.py
+BOT_THEME = "ultra"
+
+# Auto-generate FileToLink links when a file is sent straight to the
+# bot in PM (users can opt out individually in /usetting)
+FILETOLINK_AUTO = True
+
+# /tokengen — OPTIONAL shared Google OAuth client (type: Web application).
+# Users can always bring their own client on the token page, so these are
+# only needed if you want to offer a one-click default. Add
+# <BASE_URL>/app/token-generator/callback as an authorized redirect URI.
+GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_SECRET = ""
+# Or paste the whole credentials.json contents instead of the two above:
+GOOGLE_CREDENTIALS_JSON = ""

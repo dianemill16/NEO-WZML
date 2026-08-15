@@ -653,6 +653,13 @@ async def get_user_settings(from_user, stype="main"):
             f"userset {user_id} tog USER_TOKENS {'f' if user_tokens else 't'}",
         )
 
+        if Config.FILETOLINK_ENABLED and Config.FILETOLINK_AUTO:
+            auto_f2l = user_dict.get("AUTO_FILETOLINK", True)
+            buttons.data_button(
+                f"{'Disable' if auto_f2l else 'Enable'} Auto FileToLink",
+                f"userset {user_id} tog AUTO_FILETOLINK {'f' if auto_f2l else 't'}",
+            )
+
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
 
@@ -668,6 +675,7 @@ async def get_user_settings(from_user, stype="main"):
  • <b>Default Upload Package:</b> <b>{du}</b>
  • <b>Default Usage Mode:</b> <b>{tr}'s</b> token/config
  • <b>yt Cookies Mode:</b> <b>{cookie_mode}</b>
+ • <b>Auto FileToLink:</b> <b>{'Enabled' if user_dict.get('AUTO_FILETOLINK', True) else 'Disabled'}</b>
 """
 
     elif stype == "leech":
@@ -1089,10 +1097,43 @@ async def get_user_settings(from_user, stype="main"):
  • <b>Stop Duplicate:</b> <b>{sd_msg}</b>
 """
 
+    elif stype == "encode":
+        specs = user_dict.get("ENCODE_PROFILES") or {}
+        cmds = user_dict.get("FFMPEG_CMDS")
+        if not cmds and "FFMPEG_CMDS" not in user_dict:
+            cmds = Config.FFMPEG_CMDS or {}
+        cmds = cmds or {}
+
+        for name in list(cmds)[:20]:
+            spec = specs.get(name) or {}
+            label = f"⭐ {name}" if spec.get("is_default") else name
+            buttons.data_button(label, f"userset {user_id} enc_view {name}")
+
+        if Config.BASE_URL:
+            buttons.data_button(
+                "🌐 Open Builder", f"userset {user_id} enc_web", "header"
+            )
+        buttons.data_button("Back", f"userset {user_id} back ffset", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer")
+
+        default_name = next(
+            (n for n, s in specs.items() if s.get("is_default")), None
+        )
+        text = (
+            "<blockquote><b>◈ ENCODE PROFILES</b></blockquote>\n"
+            f"┃ <b>Saved:</b> {len(cmds) or 'none yet'}\n"
+            f"┃ <b>Default:</b> {default_name or 'none'}\n\n"
+            "┃ Build presets visually in the web builder —\n"
+            "┃ codec, CRF, audio, subtitles, metadata.\n"
+            "┃ Use one on a task with <code>-ff &lt;name&gt;</code>."
+        )
+        btns = buttons.build_menu(2)
+
     elif stype == "ffset":
         buttons.data_button(
             "FFmpeg Cmds", f"userset {user_id} menu FFMPEG_CMDS", "header"
         )
+        buttons.data_button("🎬 Encode Profiles", f"userset {user_id} encode")
 
         ffc = user_dict.get("FFMPEG_CMDS")
         if not ffc and "FFMPEG_CMDS" not in user_dict and Config.FFMPEG_CMDS:
@@ -1646,9 +1687,93 @@ async def edit_user_settings(client, query):
         "advanced",
         "gdrive",
         "rclone",
+        "encode",
     ]:
         await query.answer()
         await update_user_settings(query, data[2])
+    elif data[2] == "enc_web":
+        await query.answer()
+        from web.encode_store import sign_user
+
+        buttons = ButtonMaker()
+        if not Config.BASE_URL:
+            buttons.data_button("Back", f"userset {user_id} back encode")
+            await edit_message(
+                message,
+                "<b>BASE_URL is not configured</b> — the web builder needs it.",
+                buttons.build_menu(1),
+            )
+            return
+        url = (
+            f"{Config.BASE_URL.rstrip('/')}/app/encode-profiles"
+            f"?user={user_id}&token={sign_user(user_id)}"
+        )
+        buttons.url_button("🌐 Open Encode Builder", url)
+        buttons.data_button("Back", f"userset {user_id} back encode")
+        await edit_message(
+            message,
+            "<blockquote><b>◈ ENCODE BUILDER</b></blockquote>\n"
+            "┃ Create and edit profiles visually, with a live\n"
+            "┃ ffmpeg command preview.\n\n"
+            "<i>The link is personal — don't share it.</i>",
+            buttons.build_menu(1),
+        )
+    elif data[2] == "enc_view":
+        await query.answer()
+        name = data[3]
+        specs = user_data.get(user_id, {}).get("ENCODE_PROFILES") or {}
+        cmds = user_data.get(user_id, {}).get("FFMPEG_CMDS") or Config.FFMPEG_CMDS or {}
+        spec = specs.get(name) or {}
+        cmd = cmds.get(name)
+        if isinstance(cmd, list):
+            cmd = " ".join(str(c) for c in cmd)
+
+        buttons = ButtonMaker()
+        if spec and not spec.get("is_default"):
+            buttons.data_button("⭐ Set Default", f"userset {user_id} enc_def {name}")
+        buttons.data_button("✕ Delete", f"userset {user_id} enc_del {name}")
+        buttons.data_button("Back", f"userset {user_id} back encode", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer")
+
+        v = spec.get("video_params") or {}
+        a = spec.get("audio_params") or {}
+        crf = v.get("crf")
+        v_line = spec.get("video_codec") or "—"
+        if crf is not None:
+            v_line += f" · CRF {crf}"
+        a_line = spec.get("audio_codec") or "—"
+        if a.get("bitrate"):
+            a_line += f" · {a['bitrate']}"
+        text = (
+            f"<blockquote><b>◈ {name}</b></blockquote>\n"
+            f"┃ <b>Video:</b> {v_line}\n"
+            f"┃ <b>Audio:</b> {a_line}\n"
+            f"┃ <b>Container:</b> {spec.get('container') or '—'}\n"
+            f"┃ <b>Subtitles:</b> {spec.get('subtitle_mode') or '—'}\n\n"
+            f"<code>{cmd or 'no command stored'}</code>"
+        )
+        await edit_message(message, text, buttons.build_menu(2))
+    elif data[2] == "enc_def":
+        name = data[3]
+        specs = user_data.get(user_id, {}).get("ENCODE_PROFILES") or {}
+        for key, spec in specs.items():
+            spec["is_default"] = key == name
+        update_user_ldata(user_id, "ENCODE_PROFILES", specs)
+        await database.update_user_data(user_id)
+        await query.answer(f"{name} is now your default!", show_alert=True)
+        await update_user_settings(query, "encode")
+    elif data[2] == "enc_del":
+        name = data[3]
+        user_dict_now = user_data.get(user_id, {})
+        specs = user_dict_now.get("ENCODE_PROFILES") or {}
+        cmds = user_dict_now.get("FFMPEG_CMDS") or {}
+        specs.pop(name, None)
+        cmds.pop(name, None)
+        update_user_ldata(user_id, "ENCODE_PROFILES", specs)
+        update_user_ldata(user_id, "FFMPEG_CMDS", cmds)
+        await database.update_user_data(user_id)
+        await query.answer(f"Deleted {name}", show_alert=True)
+        await update_user_settings(query, "encode")
     elif data[2] == "uphoster_destinations":
         await query.answer()
         user_dict = user_data.get(user_id, {})

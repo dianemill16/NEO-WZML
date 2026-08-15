@@ -1,9 +1,13 @@
 # This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML)
 
+from pyrogram import filters as media_filter
 from pyrogram.filters import command, private, regex
 from pyrogram.handlers import CallbackQueryHandler, EditedMessageHandler, MessageHandler
 from pyrogram.types import BotCommand
 
+from bot import LOGGER, bot_loop
+
+_set_commands_task = None
 from bot.core.config_manager import Config
 from bot.helper.ext_utils.help_messages import get_bot_commands
 from bot.helper.telegram_helper.bot_commands import BotCommands
@@ -337,6 +341,41 @@ def add_handlers():
     )
     TgClient.bot.add_handler(
         MessageHandler(
+            auto_rename,
+            filters=command(BotCommands.AutoRenameCommand, case_sensitive=True)
+            & (private | CustomFilters.authorized),
+        )
+    )
+    TgClient.bot.add_handler(
+        MessageHandler(
+            file_to_link,
+            filters=command(BotCommands.FileToLinkCommand, case_sensitive=True)
+            & (private | CustomFilters.authorized),
+        )
+    )
+    # Auto-link for files sent straight to the bot in PM. Registered in a
+    # later group so interactive flows (thumbnail/rclone/token uploads,
+    # which sit in group -1) and every command handler get the message
+    # first; it raises ContinuePropagation whenever it declines.
+    TgClient.bot.add_handler(
+        MessageHandler(
+            auto_file_to_link,
+            filters=private
+            & (media_filter.document | media_filter.video | media_filter.audio
+               | media_filter.animation | media_filter.voice)
+            & CustomFilters.authorized,
+        ),
+        group=3,
+    )
+    TgClient.bot.add_handler(
+        MessageHandler(
+            token_generator,
+            filters=command(BotCommands.TokenGenCommand, case_sensitive=True)
+            & (private | CustomFilters.authorized),
+        )
+    )
+    TgClient.bot.add_handler(
+        MessageHandler(
             ytdl,
             filters=command(BotCommands.YtdlCommand, case_sensitive=True)
             & CustomFilters.authorized,
@@ -439,4 +478,13 @@ def add_handlers():
                     BotCommand(f"{cmd.lower()}{Config.CMD_SUFFIX}", description)
                 )
 
-        TgClient.bot.set_bot_commands(telegram_commands)
+        def _log_cmd_failure(task):
+            if not task.cancelled() and (exc := task.exception()):
+                LOGGER.error(f"Failed to set bot commands: {exc}")
+
+        # keep a strong reference so the task can't be GC'd mid-flight
+        global _set_commands_task
+        _set_commands_task = bot_loop.create_task(
+            TgClient.bot.set_bot_commands(telegram_commands)
+        )
+        _set_commands_task.add_done_callback(_log_cmd_failure)

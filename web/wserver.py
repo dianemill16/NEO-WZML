@@ -6,15 +6,23 @@ install()
 
 from asyncio import sleep, to_thread
 from hashlib import blake2b
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from contextlib import asynccontextmanager
 from logging import INFO, WARNING, FileHandler, StreamHandler, basicConfig, getLogger
 
 from aioaria2 import Aria2HttpClient
 from aiohttp.client_exceptions import ClientError
 from aioqbt.client import create_client
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import (
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from aioqbt.exc import AQError
 
@@ -38,6 +46,17 @@ from web.rclone_selection_store import (
     update_selected_ids as set_rclone_selected_ids,
 )
 from aiohttp import ClientSession
+
+# the web server runs as its own gunicorn process, so it loads config
+# itself (FileToLink needs BOT_TOKEN/HELPER_TOKENS and the bin chat)
+from bot.core.config_manager import Config
+
+try:
+    Config.load()
+except Exception:
+    # missing/incomplete config only disables FileToLink; the rest of
+    # the web UI (torrent/file selection) must still come up
+    pass
 
 getLogger("httpx").setLevel(WARNING)
 getLogger("aiohttp").setLevel(WARNING)
@@ -77,10 +96,21 @@ async def lifespan(app: FastAPI):
     await qbittorrent.close()
     if proxy_session is not None:
         await proxy_session.close()
+    from web.mongo import close as close_mongo
+    from web.streamer import StreamClients
+
+    await StreamClients.stop()
+    close_mongo()
 
 
 app = FastAPI(lifespan=lifespan)
 
+from os import path as _ospath
+
+from fastapi.staticfiles import StaticFiles
+
+if _ospath.isdir("web/static"):
+    app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
 templates = Jinja2Templates(directory="web/templates/")
 
@@ -415,6 +445,525 @@ async def set_aria2(gid, selected_files):
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
     return templates.TemplateResponse(request, "landing.html")
+
+
+# ─────────────────────── Google token generator ───────────────────
+#
+# The user brings their own OAuth client (upload credentials.json or
+# paste id/secret), so the bot host needs no credentials.json. An owner
+# client, when configured, is offered as a one-click default.
+
+
+def _token_page(request, **ctx):
+    ctx.setdefault("title", "Google Token Generator")
+    return templates.TemplateResponse(request, "token_generator.html", ctx)
+
+
+def _token_auth_ok(user_id, token):
+    from web.security import PURPOSE_GOOGLE, verify_signed_token
+
+    return user_id.isdigit() and verify_signed_token(PURPOSE_GOOGLE, user_id, token)
+
+
+@app.get("/app/token-generator", response_class=HTMLResponse)
+async def token_generator_page(request: Request, user_id: str = "", token: str = ""):
+    from web.token_gen import host_credentials, redirect_uri
+
+    if not _token_auth_ok(user_id, token):
+        return _token_page(
+            request,
+            state="error",
+            message="This link is invalid or has expired. Run /tokengen again.",
+        )
+    if not Config.BASE_URL:
+        return _token_page(
+            request, state="error", message="BASE_URL is not configured."
+        )
+
+    host_id, _ = host_credentials()
+    return _token_page(
+        request,
+        state="form",
+        user_id=user_id,
+        token=token,
+        has_host_client=bool(host_id),
+        redirect_uri=redirect_uri(),
+    )
+
+
+@app.post("/app/token-generator", response_class=HTMLResponse)
+async def token_generator_start(
+    request: Request,
+    user_id: str = Form(""),
+    token: str = Form(""),
+    mode: str = Form("own"),
+    client_id: str = Form(""),
+    client_secret: str = Form(""),
+    credentials_file: UploadFile = File(None),
+):
+    from web.token_gen import (
+        host_credentials,
+        parse_client_json,
+        redirect_uri,
+        authorization_url,
+        stash_client,
+        validate_client,
+    )
+
+    if not _token_auth_ok(user_id, token):
+        return _token_page(
+            request,
+            state="error",
+            message="This link is invalid or has expired. Run /tokengen again.",
+        )
+
+    def back(err):
+        host_id, _ = host_credentials()
+        return _token_page(
+            request,
+            state="form",
+            user_id=user_id,
+            token=token,
+            has_host_client=bool(host_id),
+            redirect_uri=redirect_uri(),
+            form_error=err,
+        )
+
+    try:
+        if mode == "host":
+            cid, secret = host_credentials()
+            if not cid:
+                return back("The owner hasn't configured a shared Google client.")
+        elif credentials_file is not None and credentials_file.filename:
+            raw = (await credentials_file.read(64 * 1024 + 1)).decode(
+                "utf-8", "replace"
+            )
+            cid, secret = parse_client_json(raw)
+        elif client_id or client_secret:
+            cid, secret = validate_client(client_id, client_secret)
+        else:
+            return back(
+                "Upload your credentials.json, or paste the client ID and secret."
+            )
+    except ValueError as e:
+        return back(str(e))
+    except Exception as e:
+        LOGGER.error(f"TokenGen: bad client input: {e}")
+        return back("Couldn't read that credentials file.")
+
+    nonce = stash_client(user_id, cid, secret)
+    return RedirectResponse(authorization_url(cid, nonce), status_code=303)
+
+
+@app.get("/app/token-generator/callback", response_class=HTMLResponse)
+async def token_generator_callback(
+    request: Request, code: str = "", state: str = "", error: str = ""
+):
+    from web.token_gen import exchange_code, store_token, take_client
+
+    if error:
+        return _token_page(request, state="error", message=f"Google returned: {error}")
+    if not state:
+        return _token_page(
+            request, state="error", message="Google returned no state value."
+        )
+
+    # the nonce identifies both the pending client and its owner
+    from web.token_gen import _PENDING, _sweep
+
+    _sweep()
+    entry = _PENDING.get(state)
+    if not entry:
+        return _token_page(
+            request,
+            state="error",
+            message="This sign-in expired or was already used. Run /tokengen again.",
+        )
+    user_id = entry["user_id"]
+    cid, secret = take_client(state, user_id)
+    if not cid:
+        return _token_page(
+            request,
+            state="error",
+            message="This sign-in expired or was already used. Run /tokengen again.",
+        )
+    if not code:
+        return _token_page(
+            request, state="error", message="No authorization code returned."
+        )
+
+    try:
+        token_bytes = await exchange_code(code, cid, secret)
+        await store_token(user_id, token_bytes)
+    except Exception as e:
+        LOGGER.error(f"TokenGen: exchange failed for {user_id}: {e}")
+        return _token_page(request, state="error", message=str(e))
+
+    LOGGER.info(f"TokenGen: stored token.pickle for user {user_id}")
+    return _token_page(request, state="done", user_id=user_id)
+
+
+# ──────────────────────── Encoding profiles ───────────────────────
+#
+# Two things are stored per user: ENCODE_PROFILES holds the editable
+# spec so the builder can reopen a profile, and FFMPEG_CMDS holds the
+# generated command so `-ff <name>` keeps working untouched.
+
+
+def _encode_auth(user: str, token: str):
+    from web.encode_store import verify_user
+
+    if not user or not str(user).isdigit() or not verify_user(user, token):
+        raise HTTPException(status_code=403, detail="Invalid or missing token")
+    return int(user)
+
+
+async def _load_encode(user_id):
+    """Returns (specs, commands)."""
+    from web.mongo import users_collection
+
+    coll = users_collection()
+    if coll is None:
+        return {}, dict(Config.FFMPEG_CMDS or {})
+    doc = await coll.find_one(
+        {"_id": user_id}, {"ENCODE_PROFILES": 1, "FFMPEG_CMDS": 1}
+    ) or {}
+    return (
+        doc.get("ENCODE_PROFILES") or {},
+        doc.get("FFMPEG_CMDS") or dict(Config.FFMPEG_CMDS or {}),
+    )
+
+
+async def _save_encode(user_id, specs, commands):
+    from web.mongo import users_collection
+
+    coll = users_collection()
+    if coll is None:
+        return False
+    await coll.update_one(
+        {"_id": user_id},
+        {"$set": {"ENCODE_PROFILES": specs, "FFMPEG_CMDS": commands}},
+        upsert=True,
+    )
+    return True
+
+
+@app.get("/app/encode-profiles", response_class=HTMLResponse)
+async def encode_profiles_page(request: Request, user: str = "", token: str = ""):
+    _encode_auth(user, token)
+    from web.encode_store import (
+        AUDIO_CODECS,
+        CONTAINERS,
+        DISPOSITIONS,
+        NAMED_PRESETS,
+        PIX_FMTS,
+        RESOLUTIONS,
+        TEMPLATES,
+        VIDEO_CODECS,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "encode_profiles.html",
+        {
+            "video_codecs": list(VIDEO_CODECS),
+            "audio_codecs": list(AUDIO_CODECS),
+            "named_presets": list(NAMED_PRESETS),
+            "pix_fmts": list(PIX_FMTS),
+            "containers": list(CONTAINERS),
+            "resolutions": list(RESOLUTIONS),
+            "dispositions": list(DISPOSITIONS),
+            "templates": TEMPLATES,
+        },
+    )
+
+
+@app.post("/api/encode/preview")
+async def encode_preview(request: Request, user: str = "", token: str = ""):
+    _encode_auth(user, token)
+    from web.encode_store import build_command
+
+    try:
+        profile = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed body")
+    try:
+        return JSONResponse({"command": build_command(profile)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/encode/profiles")
+async def encode_list(user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    specs, commands = await _load_encode(user_id)
+    return JSONResponse({"profiles": commands, "specs": specs})
+
+
+@app.post("/api/encode/profiles")
+async def encode_save(request: Request, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    from web.encode_store import build_command, normalize, validate_name
+
+    try:
+        profile = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed body")
+
+    name = validate_name(profile.get("name"))
+    if not name:
+        return JSONResponse(
+            {"error": "Name must be 1-40 chars: letters, digits, _ or -"},
+            status_code=400,
+        )
+    try:
+        spec = normalize(profile)
+        command = build_command(profile)
+    except Exception as e:
+        return JSONResponse({"error": f"Invalid profile: {e}"}, status_code=400)
+
+    specs, commands = await _load_encode(user_id)
+    # renaming an existing profile shouldn't leave the old one behind
+    if (old := profile.get("rename_from")) and old != name:
+        specs.pop(old, None)
+        commands.pop(old, None)
+
+    if spec.get("is_default"):
+        for other in specs.values():
+            other["is_default"] = False
+    specs[name] = spec
+    commands[name] = [command]
+
+    if not await _save_encode(user_id, specs, commands):
+        return JSONResponse(
+            {"error": "DATABASE_URL is not configured — can't persist"},
+            status_code=503,
+        )
+    return JSONResponse({"ok": True, "name": name, "command": command})
+
+
+@app.post("/api/encode/profiles/{name}/default")
+async def encode_set_default(name: str, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    specs, commands = await _load_encode(user_id)
+    if name not in specs:
+        return JSONResponse({"error": "No such profile"}, status_code=404)
+    for key, spec in specs.items():
+        spec["is_default"] = key == name
+    if not await _save_encode(user_id, specs, commands):
+        return JSONResponse({"error": "DATABASE_URL is not configured"}, status_code=503)
+    return JSONResponse({"ok": True, "name": name})
+
+
+@app.delete("/api/encode/profiles/{name}")
+async def encode_delete(name: str, user: str = "", token: str = ""):
+    user_id = _encode_auth(user, token)
+    specs, commands = await _load_encode(user_id)
+    if name not in commands and name not in specs:
+        return JSONResponse({"error": "No such profile"}, status_code=404)
+    specs.pop(name, None)
+    commands.pop(name, None)
+    if not await _save_encode(user_id, specs, commands):
+        return JSONResponse({"error": "DATABASE_URL is not configured"}, status_code=503)
+    return JSONResponse({"ok": True})
+
+
+# ─────────────────────────── FileToLink ───────────────────────────
+
+
+async def _stream_response(message_id: int, sig: str, request: Request, as_attachment):
+    from fastapi.responses import StreamingResponse
+
+    from web.streamer import (
+        ByteStreamer,
+        NoStreamClients,
+        StreamClients,
+        bin_chat,
+        range_params,
+        verify,
+    )
+
+    chat_id = bin_chat()
+    if not chat_id:
+        raise HTTPException(status_code=503, detail="FileToLink is not configured")
+
+    if not verify(chat_id, message_id, sig):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+
+    await StreamClients.start()
+    try:
+        index, client = StreamClients.pick()
+    except NoStreamClients:
+        raise HTTPException(
+            status_code=503, detail="No streaming client available — check bot tokens"
+        )
+    streamer = ByteStreamer(client, index)
+
+    try:
+        file_id, file_size, file_name, mime_type = await streamer.get_properties(
+            chat_id, message_id
+        )
+    except FileNotFoundError as e:
+        StreamClients.release(index)
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        StreamClients.release(index)
+        LOGGER.error(f"FileToLink properties error: {e}")
+        raise HTTPException(status_code=502, detail="Unable to read file")
+
+    if not file_size:
+        StreamClients.release(index)
+        raise HTTPException(status_code=404, detail="Empty file")
+
+    range_header = request.headers.get("Range")
+    start, end = 0, file_size - 1
+    partial = False
+    if range_header:
+        try:
+            raw_range = range_header.replace("bytes=", "").strip().split("-", 1)
+            first, last = raw_range[0].strip(), (
+                raw_range[1].strip() if len(raw_range) > 1 else ""
+            )
+            if not first:
+                # suffix form "bytes=-N" — the LAST n bytes, not the whole file
+                if not last:
+                    raise ValueError("empty range")
+                start = max(0, file_size - int(last))
+                end = file_size - 1
+            else:
+                start = int(first)
+                end = int(last) if last else end
+            partial = True
+        except ValueError:
+            StreamClients.release(index)
+            raise HTTPException(status_code=416, detail="Malformed Range header")
+    if start < 0 or end >= file_size or start > end:
+        StreamClients.release(index)
+        return JSONResponse(
+            {"error": "Requested range not satisfiable"},
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    offset, first_cut, last_cut, part_count = range_params(start, end, file_size)
+    disposition = "attachment" if as_attachment else "inline"
+    safe_name = quote(file_name)
+    headers = {
+        "Content-Type": mime_type,
+        "Content-Length": str(end - start + 1),
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'{disposition}; filename="{safe_name}"',
+        "Cache-Control": "public, max-age=3600",
+    }
+    if partial:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+    # StreamingResponse always drains its iterator, so a HEAD would pull
+    # the whole file from Telegram just to discard it — answer with
+    # headers only.
+    if request.method == "HEAD":
+        StreamClients.release(index)
+        return Response(
+            status_code=206 if partial else 200,
+            headers=headers,
+            media_type=mime_type,
+        )
+
+    async def body():
+        try:
+            async for chunk in streamer.yield_file(
+                file_id, offset, first_cut, last_cut, part_count
+            ):
+                yield chunk
+        except Exception as e:
+            # headers already promised Content-Length; log loudly so a
+            # truncated transfer isn't mistaken for a clean one
+            LOGGER.error(
+                f"FileToLink stream aborted for {message_id} "
+                f"(bytes {start}-{end}): {e}"
+            )
+            streamer.invalidate(chat_id, message_id)
+        finally:
+            StreamClients.release(index)
+
+    return StreamingResponse(
+        body(),
+        status_code=206 if partial else 200,
+        headers=headers,
+        media_type=mime_type,
+    )
+
+
+@app.get("/api/filetolink/status")
+async def filetolink_status():
+    from web.streamer import ByteStreamer, StreamClients
+
+    return JSONResponse(
+        {
+            "clients": len(StreamClients.loads()),
+            "loads": StreamClients.loads(),
+            "cached": len(ByteStreamer._props_cache),
+            "sessions": len(ByteStreamer._sessions),
+        }
+    )
+
+
+@app.head("/stream/{message_id}/{sig}")
+@app.get("/stream/{message_id}/{sig}")
+async def stream_media(message_id: int, sig: str, request: Request):
+    return await _stream_response(message_id, sig, request, as_attachment=False)
+
+
+@app.head("/dl/{message_id}/{sig}")
+@app.get("/dl/{message_id}/{sig}")
+async def download_media(message_id: int, sig: str, request: Request):
+    return await _stream_response(message_id, sig, request, as_attachment=True)
+
+
+@app.get("/watch/{message_id}/{sig}", response_class=HTMLResponse)
+async def watch_media(message_id: int, sig: str, request: Request):
+    from web.streamer import (
+        ByteStreamer,
+        NoStreamClients,
+        StreamClients,
+        bin_chat,
+        verify,
+    )
+
+    chat_id = bin_chat()
+    if not chat_id:
+        raise HTTPException(status_code=503, detail="FileToLink is not configured")
+    if not verify(chat_id, message_id, sig):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+
+    await StreamClients.start()
+    try:
+        index, client = StreamClients.pick()
+    except NoStreamClients:
+        raise HTTPException(status_code=503, detail="No streaming client available")
+    streamer = ByteStreamer(client, index)
+    try:
+        _, file_size, file_name, mime_type = await streamer.get_properties(
+            chat_id, message_id
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        StreamClients.release(index)
+
+    return templates.TemplateResponse(
+        request,
+        "player.html",
+        {
+            "file_name": file_name,
+            "file_size": file_size,
+            "mime_type": mime_type,
+            "stream_url": f"/stream/{message_id}/{sig}",
+            "download_url": f"/dl/{message_id}/{sig}",
+            "is_video": mime_type.startswith("video/"),
+            "is_audio": mime_type.startswith("audio/"),
+        },
+    )
 
 
 def rewrite_location(location: str, proxy_prefix: str) -> str:

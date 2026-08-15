@@ -1061,6 +1061,14 @@ def get_help_string(user_id=None, is_sudo=False):
 
 
 config_descriptions = {
+    "BUTTON_STYLE": "Accent style for inline buttons (none/blue/red/green/purple/orange/yellow/diamond/star/arrow/bracket). Set via /bsetting > Button Style",
+    "FILETOLINK_ENABLED": "Enable /link streaming gateway. Needs BASE_URL and FILETOLINK_CHAT (or LEECH_DUMP_CHAT)",
+    "GOOGLE_CLIENT_ID": "Optional shared OAuth client ID for /tokengen, offered as a one-click default. Users can always bring their own client instead",
+    "GOOGLE_CLIENT_SECRET": "Optional client secret paired with GOOGLE_CLIENT_ID for /tokengen",
+    "GOOGLE_CREDENTIALS_JSON": "Optional: paste an entire credentials.json to act as the shared /tokengen client",
+    "FILETOLINK_AUTO": "Auto-generate links when a file is sent straight to the bot in PM. Users can opt out in /usetting",
+    "FILETOLINK_CHAT": "Bin channel where /link stores files for streaming. Bot must be admin. Falls back to LEECH_DUMP_CHAT",
+    "AUTO_RENAME": "Global auto-rename template, e.g. {title} - S{season}E{episode} [{quality}]. Per-user via /autorename",
     "BOT_TOKEN": "The Telegram Bot Token that you got from @BotFather",
     "OWNER_ID": "Your Telegram numeric User ID (not username)",
     "TELEGRAM_API": "Telegram API ID from my.telegram.org for user session features",
@@ -1071,7 +1079,8 @@ config_descriptions = {
 
     "AUTHORIZED_CHATS": "User/Chat IDs that can use the bot. Space-separated",
     "SUDO_USERS": "User IDs with admin privileges. Space-separated",
-    "HELPER_TOKENS": "User IDs with helper privileges. Space-separated",
+    "HELPER_TOKENS": "Helper bot tokens for Hyper transfers. Space-separated",
+    "USE_HYPER": "Use helper bots for accelerated Telegram download/upload. Needs HELPER_TOKENS + LEECH_DUMP_CHAT",
     "EXCEP_CHATS": "Chat IDs where logging is disabled",
     "FORCE_SUB_IDS": "Chat IDs users must subscribe to before using the bot",
 
@@ -1178,7 +1187,7 @@ config_descriptions = {
 
     "STATUS_LIMIT": "Max number of tasks shown per status message page",
     "STATUS_UPDATE_INTERVAL": "Seconds between status message updates",
-    "BOT_THEME": "Visual theme for bot messages. Available themes in bot/helper/themes/",
+    "BOT_THEME": "Visual theme for bot messages: 'ultra' (default, matches the web UI), 'minimal', or 'random'. Add more as bot/helper/themes/neo_<name>.py",
     "TIMEZONE": "Timezone for timestamps in messages. Format: Region/City",
     "SHOW_CLOUD_LINK": "Show cloud storage link button in status messages",
     "SHOW_MEDIAINFO": "Show MediaInfo button for leeched video files",
@@ -1221,7 +1230,8 @@ config_descriptions = {
     "SET_COMMANDS": "Automatically set bot commands in Telegram on startup",
     "CMD_SUFFIX": "Suffix added to all bot commands. Useful for multi-instance",
 
-    "HYPER_THREADS": "Thread count for accelerated downloads. 0 = auto-detect",
+    "HYPER_THREADS": "Parallel transfer threads per helper client for Hyper download/upload. 0 = auto-detect",
+    "ARIA2_MAX_DL_SPEED": "Cap aria2's total download speed, e.g. 80M. Prevents VPS freeze on fast mirrors. Empty = unlimited",
     "HYDRA_IP": "Hydra download accelerator server IP. Leave empty if not using Hydra",
     "HYDRA_API_KEY": "API key for Hydra download accelerator authentication",
 

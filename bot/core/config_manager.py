@@ -7,8 +7,9 @@ from os import getenv
 class Config:
     AS_DOCUMENT = False
     AUTHORIZED_CHATS = ""
+    BUTTON_STYLE = "none"  # inline button accent: see BUTTON_STYLES
     EXCEP_CHATS = ""
-    BOT_THEME = "neo_minimal"
+    BOT_THEME = "ultra"
     BASE_URL = ""
     BASE_URL_PORT = 80
     BOT_TOKEN = ""
@@ -77,6 +78,13 @@ class Config:
     ARCHIVE_LIMIT = 0
     STORAGE_LIMIT = 0
     LEECH_DUMP_CHAT = ""
+    FILETOLINK_ENABLED = False
+    FILETOLINK_CHAT = ""  # bin channel for /link; falls back to LEECH_DUMP_CHAT
+    FILETOLINK_AUTO = True  # auto-link files sent straight to the bot in PM
+    # /tokengen — used to auto-create credentials.json when it's absent
+    GOOGLE_CLIENT_ID = ""
+    GOOGLE_CLIENT_SECRET = ""
+    GOOGLE_CREDENTIALS_JSON = ""  # or paste the whole client file here
     LINKS_LOG_ID = ""
     MIRROR_LOG_ID = ""
     CLEAN_LOG_MSG = False
@@ -88,6 +96,8 @@ class Config:
     LEECH_SPLIT_SIZE = 2097152000
     MEDIA_GROUP = False
     HYPER_THREADS = 0
+    ARIA2_MAX_DL_SPEED = ""  # e.g. "80M"; empty = unlimited
+    USE_HYPER = False
 
 
     MIRROR_PREFIX = ""
@@ -95,6 +105,7 @@ class Config:
     MIRROR_NAME_SWAP = ""
 
     LEECH_NAME_SWAP = ""
+    AUTO_RENAME = ""  # template, e.g. "{title} - S{season}E{episode} [{quality}]"
     OWNER_ID = 0
     QUEUE_ALL = 0
     QUEUE_DOWNLOAD = 0

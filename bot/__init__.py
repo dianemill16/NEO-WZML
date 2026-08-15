@@ -102,9 +102,24 @@ extra_buttons = {}
 shorteners_list = []
 
 try:
-    srun([BinConfig.QBIT_NAME, "-d", f"--profile={getcwd()}"], check=False)
+    _qb = srun(
+        [BinConfig.QBIT_NAME, "-d", f"--profile={getcwd()}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     qb_start_time = time()
-    LOGGER.info(f"qBittorrent process started: {BinConfig.QBIT_NAME}")
+    if _qb.returncode == 0:
+        LOGGER.info(f"qBittorrent process started: {BinConfig.QBIT_NAME}")
+    elif "already running" in (_qb.stderr or "").lower():
+        # survivor from a previous run of this container — the bot
+        # connects to it below, so this is normal after a soft restart
+        LOGGER.info("qBittorrent already running — reusing the existing daemon")
+    else:
+        LOGGER.error(
+            f"qBittorrent failed to start ({BinConfig.QBIT_NAME}): "
+            f"{(_qb.stderr or _qb.stdout or '').strip()}"
+        )
 except FileNotFoundError:
     qb_start_time = 0
     LOGGER.error(

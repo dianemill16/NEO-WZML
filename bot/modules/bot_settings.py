@@ -68,7 +68,7 @@ bool_vars = [
     'DISABLE_BULK', 'DISABLE_MULTI', 'DISABLE_SEED',
     'DISABLE_FF_MODE', 'JD_MODE',
     'MEGA_ENABLED', 'TERABOX_ENABLED', 'MEDIA_STORE', 'SHOW_CLOUD_LINK',
-    'UPDATE_PKGS', 'AUTO_UPDATE',
+    'UPDATE_PKGS', 'AUTO_UPDATE', 'USE_HYPER',
 ]
 
 start_dict = {}
@@ -139,8 +139,24 @@ async def get_buttons(key=None, edit_type=None, edit_mode=False, message=None):
         buttons.data_button("Private Files", "botset private open")
         buttons.data_button("Qbit Settings", "botset qbit")
         buttons.data_button("Universal Tasks", "botset universal")
+        buttons.data_button("Button Style", "botset btnstyle")
         buttons.data_button("Close", "botset close")
         msg = '<blockquote><b><i>Bot Settings:</i></b></blockquote>'
+    elif key == "btnstyle":
+        from bot.helper.telegram_helper.button_build import BUTTON_STYLES
+
+        current = getattr(Config, "BUTTON_STYLE", "none") or "none"
+        for name in BUTTON_STYLES:
+            label = f"✅ {name.title()}" if name == current else name.title()
+            buttons.data_button(label, f"botset setbtnstyle {name}")
+        buttons.data_button("Back", "botset back", position="footer")
+        buttons.data_button("Close", "botset close", position="footer")
+        msg = (
+            "<blockquote><b><i>Inline Button Style</i></b></blockquote>\n\n"
+            "Pick an accent applied to every inline button label.\n"
+            f"<b>Current:</b> <code>{current}</code>"
+        )
+        return msg, buttons.build_menu(2)
     elif edit_type is not None:
         if edit_type == "botvar":
             from bot.helper.ext_utils.help_messages import config_descriptions
@@ -703,9 +719,18 @@ async def edit_bot_settings(client, query):
             show_alert=True,
         )
         await sync_jdownloader()
-    elif data[1] in ["var", "aria", "qbit"]:
+    elif data[1] in ["var", "aria", "qbit", "btnstyle"]:
         await query.answer()
         await update_buttons(message, data[1])
+    elif data[1] == "setbtnstyle":
+        from bot.helper.telegram_helper.button_build import BUTTON_STYLES
+
+        style = data[2] if len(data) > 2 and data[2] in BUTTON_STYLES else "none"
+        Config.set("BUTTON_STYLE", style)
+        if Config.DATABASE_URL:
+            await database.update_config({"BUTTON_STYLE": style})
+        await query.answer(f"✅ Button style: {style}", show_alert=False)
+        await update_buttons(message, "btnstyle")
     elif data[1] == "resetvar":
         handler_dict[chat_id] = False
         await query.answer()

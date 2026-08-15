@@ -2,6 +2,40 @@
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# Telegram inline buttons can't be truly colored, so "button color" is an
+# accent decoration applied to the label. Each style maps to (prefix, suffix)
+# wrapped around the button text. "none" = plain (default look).
+BUTTON_STYLES = {
+    "none": ("", ""),
+    "blue": ("🔵 ", ""),
+    "red": ("🔴 ", ""),
+    "green": ("🟢 ", ""),
+    "purple": ("🟣 ", ""),
+    "orange": ("🟠 ", ""),
+    "yellow": ("🟡 ", ""),
+    "diamond": ("🔹 ", ""),
+    "star": ("✦ ", ""),
+    "arrow": ("➤ ", ""),
+    "bracket": ("『 ", " 』"),
+}
+
+
+def _decorate(key):
+    from bot.core.config_manager import Config
+
+    style = getattr(Config, "BUTTON_STYLE", "") or "none"
+    prefix, suffix = BUTTON_STYLES.get(style, ("", ""))
+    if not prefix and not suffix:
+        return key
+    # don't decorate labels that already start with an emoji/symbol accent
+    text = str(key)
+    # many theme labels already lead with their own emoji (☁️ Cloud,
+    # 📨 Save, ⚡ Index…) — stacking a second accent on those looks broken
+    first = text[:1]
+    if not first or (not first.isalnum() and first not in "([<#/"):
+        return text
+    return f"{prefix}{text}{suffix}"
+
 
 class ButtonMaker:
     def __init__(self):
@@ -15,12 +49,12 @@ class ButtonMaker:
 
     def url_button(self, key, link, position=None):
         self.buttons[position if position in self.buttons else "default"].append(
-            InlineKeyboardButton(text=key, url=link)
+            InlineKeyboardButton(text=_decorate(key), url=link)
         )
 
     def data_button(self, key, data, position=None):
         self.buttons[position if position in self.buttons else "default"].append(
-            InlineKeyboardButton(text=key, callback_data=data)
+            InlineKeyboardButton(text=_decorate(key), callback_data=data)
         )
 
     def build_menu(self, b_cols=1, h_cols=8, fb_cols=2, lb_cols=2, f_cols=8):

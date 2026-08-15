@@ -1,0 +1,691 @@
+<!-- This file is a part of NEO-WZML (github.com/irisXDR/NEO-WZML) -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Encoding Profiles — NEO-WZML ULTRA</title>
+    <link rel="icon" type="image/png" href="https://iili.io/FLRJNMG.th.png" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/static/ultra.css" />
+    <style>
+      .fs-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-secondary);
+        margin: 1.4rem 0 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .fs-label:first-of-type { margin-top: 0; }
+      .fs-label .tip {
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .preview-wrap { position: relative; }
+      .preview-wrap .copy {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.75rem;
+      }
+
+      .tpl-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .tpl {
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+      }
+      .tpl:hover {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+        background: var(--bg-hover);
+      }
+
+      .prof-chip .star { color: var(--warning); }
+      .prof-chip b { cursor: pointer; }
+      .prof-chip .act {
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.78rem;
+      }
+      .prof-chip .act:hover { color: var(--accent-primary); }
+      .prof-chip .act.del:hover { color: var(--danger); }
+
+      .kv { display: grid; gap: 0.5rem; }
+      .kv-row { display: flex; gap: 0.5rem; align-items: center; }
+      .kv-row input, .kv-row select { flex: 1; }
+      .kv-row .rm {
+        flex: none;
+        width: 34px;
+        border-radius: 9px;
+        border: 1px solid var(--border-color);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0.5rem 0;
+      }
+      .kv-row .rm:hover { color: var(--danger); border-color: var(--danger); }
+      .add-row {
+        margin-top: 0.5rem;
+        font-size: 0.78rem;
+        background: none;
+        border: 0;
+        color: var(--accent-primary);
+        cursor: pointer;
+        font-family: inherit;
+        padding: 0;
+      }
+      .add-row:hover { text-decoration: underline; }
+
+      details.adv { margin-top: 1.4rem; }
+      details.adv summary {
+        cursor: pointer;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-secondary);
+        list-style: none;
+      }
+      details.adv summary::-webkit-details-marker { display: none; }
+      details.adv summary::before { content: "▸ "; }
+      details.adv[open] summary::before { content: "▾ "; }
+      details.adv > *:not(summary) { margin-top: 0.9rem; }
+
+      .hide { display: none !important; }
+      .editing-note {
+        font-size: 0.78rem;
+        color: var(--warning);
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="u-header">
+      <div class="u-header-inner">
+        <a class="u-logo" href="/">
+          <span class="u-logo-mark">N</span>
+          <span class="u-logo-text">NEO-WZML</span>
+          <span class="u-tag">Ultra</span>
+        </a>
+        <span class="u-tag"><i class="fa-solid fa-sliders"></i> Encoder</span>
+      </div>
+    </header>
+
+    <main class="u-wrap narrow">
+      <div class="u-page-head">
+        <h1 class="u-title">Encoding Profiles</h1>
+        <p class="u-sub">
+          Build an FFmpeg preset visually. Run it on any task with
+          <code>-ff &lt;name&gt;</code>, or star one to make it your default.
+        </p>
+      </div>
+
+      <section class="u-card">
+        <h2>Your profiles</h2>
+        <div class="u-chips" id="profiles">
+          <span class="u-empty">Loading…</span>
+        </div>
+      </section>
+
+      <section class="u-card">
+        <h2>Start from a template</h2>
+        <div class="tpl-row">
+          {% for key, t in templates.items() %}
+          <button class="tpl" type="button" data-tpl="{{ key }}">
+            {{ t.name.replace('_', ' ') }}
+          </button>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="u-card">
+        <h2>Build a profile</h2>
+
+        <div class="fs-label">Identity</div>
+        <div class="u-grid">
+          <div>
+            <label for="name">Profile name</label>
+            <input id="name" placeholder="e.g. hevc1080" autocomplete="off" />
+          </div>
+          <div>
+            <label for="container">Output container</label>
+            <select id="container">
+              {% for c in containers %}
+              <option value="{{ c }}">{{ c|upper }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="resolution">Resolution</label>
+            <select id="resolution">
+              {% for r in resolutions %}
+              <option value="{{ r }}">
+                {% if r == 'source' %}Keep source{% else %}{{ r }}p{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="u-check">
+          <input type="checkbox" id="is_default" />
+          <label for="is_default">Use as my default profile</label>
+        </div>
+        <div class="editing-note hide" id="editingNote"></div>
+
+        <div class="fs-label">Video</div>
+        <div class="u-grid">
+          <div>
+            <label for="video_codec">Codec</label>
+            <select id="video_codec">
+              {% for c in video_codecs %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="crf">Quality · CRF <span class="u-val" id="crfv">24</span></label>
+            <input type="range" id="crf" min="0" max="63" value="24" />
+          </div>
+          <div>
+            <label for="preset">Speed preset</label>
+            <select id="preset"></select>
+          </div>
+          <div>
+            <label for="pix_fmt">Pixel format</label>
+            <select id="pix_fmt">
+              {% for p in pix_fmts %}
+              <option value="{{ p }}">{{ p or 'Auto' }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="fs-label">Audio</div>
+        <div class="u-grid">
+          <div>
+            <label for="audio_codec">Codec</label>
+            <select id="audio_codec">
+              {% for c in audio_codecs %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="audio_bitrate">Bitrate (kbps)</label>
+            <input id="audio_bitrate" type="number" min="32" max="512"
+                   placeholder="128" />
+          </div>
+          <div>
+            <label for="audio_channels">Channels</label>
+            <select id="audio_channels">
+              <option value="">Keep source</option>
+              <option value="1">1 · Mono</option>
+              <option value="2">2 · Stereo</option>
+              <option value="6">6 · 5.1</option>
+              <option value="8">8 · 7.1</option>
+            </select>
+          </div>
+        </div>
+        <div class="u-check">
+          <input type="checkbox" id="audio_vbr" />
+          <label for="audio_vbr">Variable bitrate (Opus / AAC)</label>
+        </div>
+
+        <div class="fs-label">Subtitles &amp; tracks</div>
+        <div class="u-grid">
+          <div>
+            <label for="subtitle_mode">Subtitles</label>
+            <select id="subtitle_mode">
+              <option value="copy">Keep</option>
+              <option value="remove">Remove</option>
+            </select>
+          </div>
+          <div>
+            <label for="track_video">Video tracks</label>
+            <input id="track_video" value="0" autocomplete="off" />
+          </div>
+          <div>
+            <label for="track_audio">Audio tracks</label>
+            <input id="track_audio" value="?" autocomplete="off" />
+          </div>
+          <div>
+            <label for="track_subtitle">Subtitle tracks</label>
+            <input id="track_subtitle" value="?" autocomplete="off" />
+          </div>
+        </div>
+        <p class="u-hint" style="margin-top: 0.5rem">
+          <code>?</code> keeps every track; use indices like <code>0</code> or
+          <code>0,1</code> to pick specific ones.
+        </p>
+
+        <details class="adv">
+          <summary>Advanced</summary>
+
+          <div class="fs-label">
+            Codec tuning
+            <span class="tip">profile / level / codec params</span>
+          </div>
+          <div class="u-grid">
+            <div>
+              <label for="v_profile">Video profile</label>
+              <input id="v_profile" placeholder="e.g. high / main10"
+                     autocomplete="off" />
+            </div>
+            <div>
+              <label for="v_level">Level</label>
+              <input id="v_level" placeholder="e.g. 4.1" autocomplete="off" />
+            </div>
+            <div>
+              <label for="extra_params">Codec params</label>
+              <input id="extra_params" placeholder="tune=animation:aq-mode=3"
+                     autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="fs-label">Colour</div>
+          <div class="u-grid">
+            <div>
+              <label for="color_primaries">Primaries</label>
+              <input id="color_primaries" placeholder="bt709" autocomplete="off" />
+            </div>
+            <div>
+              <label for="color_trc">Transfer</label>
+              <input id="color_trc" placeholder="bt709" autocomplete="off" />
+            </div>
+            <div>
+              <label for="colorspace">Colourspace</label>
+              <input id="colorspace" placeholder="bt709" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="fs-label">
+            Metadata <span class="tip">key, or stream key like s:a:0</span>
+          </div>
+          <div class="kv" id="metaRows"></div>
+          <button class="add-row" type="button" id="addMeta">
+            + add metadata
+          </button>
+
+          <div class="fs-label">
+            Disposition <span class="tip">stream spec like s:0</span>
+          </div>
+          <div class="kv" id="dispRows"></div>
+          <button class="add-row" type="button" id="addDisp">
+            + add disposition
+          </button>
+
+          <div class="fs-label">Extra ffmpeg flags</div>
+          <input id="extra_args" placeholder="-threads 4" autocomplete="off" />
+
+          <div class="u-check">
+            <input type="checkbox" id="delete_original" />
+            <label for="delete_original">Delete original after encode</label>
+          </div>
+        </details>
+
+        <div class="u-hint">Generated command</div>
+        <div class="preview-wrap">
+          <div class="u-pre" id="preview">—</div>
+          <button class="u-btn ghost copy" id="copyCmd" type="button">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+        </div>
+
+        <div class="u-actions" style="margin-top: 1.15rem">
+          <button class="u-btn" id="save" type="button">
+            <i class="fa-solid fa-floppy-disk"></i> Save profile
+          </button>
+          <button class="u-btn ghost" id="reset" type="button">
+            <i class="fa-solid fa-eraser"></i> New / clear
+          </button>
+          <span class="u-msg" id="msg"></span>
+        </div>
+        <div class="u-hint" id="useHint"></div>
+      </section>
+    </main>
+
+    <footer class="u-foot">
+      <a href="/">NEO-WZML ULTRA</a> · this link is personal — don't share it
+    </footer>
+
+    <script>
+      const TEMPLATES = {{ templates|tojson }};
+      const NAMED_PRESETS = {{ named_presets|tojson }};
+      const DISPOSITIONS = {{ dispositions|tojson }};
+      const qs = new URLSearchParams(location.search);
+      const AUTH =
+        "user=" + encodeURIComponent(qs.get("user") || "") +
+        "&token=" + encodeURIComponent(qs.get("token") || "");
+
+      const $ = (id) => document.getElementById(id);
+      let editingFrom = null;
+
+      /* preset list depends on the codec: SVT-AV1 is numeric 0-13 */
+      function syncPresets(keep) {
+        const codec = $("video_codec").value;
+        const sel = $("preset");
+        const prev = keep || sel.value;
+        sel.innerHTML = "";
+        const add = (v, label) => {
+          const o = document.createElement("option");
+          o.value = v; o.textContent = label; sel.appendChild(o);
+        };
+        add("", "Default");
+        if (codec === "libsvtav1") {
+          for (let i = 0; i <= 13; i++)
+            add(String(i), `${i}${i < 4 ? " (slowest)" : i > 9 ? " (fastest)" : ""}`);
+        } else {
+          NAMED_PRESETS.forEach((p) => add(p, p));
+        }
+        if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+      }
+
+      function kvRow(container, key, value, options) {
+        const row = document.createElement("div");
+        row.className = "kv-row";
+        const k = document.createElement("input");
+        k.placeholder = "key"; k.value = key || ""; k.className = "k";
+        let v;
+        if (options) {
+          v = document.createElement("select");
+          options.forEach((o) => {
+            const opt = document.createElement("option");
+            opt.value = o; opt.textContent = o; v.appendChild(opt);
+          });
+          v.value = value || options[0];
+        } else {
+          v = document.createElement("input");
+          v.placeholder = "value"; v.value = value || "";
+        }
+        v.className = "v";
+        const rm = document.createElement("button");
+        rm.type = "button"; rm.className = "rm"; rm.textContent = "×";
+        rm.onclick = () => { row.remove(); preview(); };
+        row.append(k, v, rm);
+        container.appendChild(row);
+        k.addEventListener("input", preview);
+        v.addEventListener("input", preview);
+        v.addEventListener("change", preview);
+      }
+
+      function readKv(container) {
+        const out = {};
+        container.querySelectorAll(".kv-row").forEach((r) => {
+          const k = r.querySelector(".k").value.trim();
+          const v = r.querySelector(".v").value.trim();
+          if (k && v) out[k] = v;
+        });
+        return out;
+      }
+
+      function collect() {
+        return {
+          name: $("name").value,
+          container: $("container").value,
+          resolution: $("resolution").value,
+          is_default: $("is_default").checked,
+          video_codec: $("video_codec").value,
+          audio_codec: $("audio_codec").value,
+          subtitle_mode: $("subtitle_mode").value,
+          video_params: {
+            crf: $("crf").value,
+            preset: $("preset").value,
+            pix_fmt: $("pix_fmt").value,
+            profile: $("v_profile").value,
+            level: $("v_level").value,
+            extra_params: $("extra_params").value,
+            color_primaries: $("color_primaries").value,
+            color_trc: $("color_trc").value,
+            colorspace: $("colorspace").value,
+          },
+          audio_params: {
+            bitrate: $("audio_bitrate").value,
+            channels: $("audio_channels").value,
+            vbr: $("audio_vbr").checked,
+          },
+          tracks: {
+            video: $("track_video").value,
+            audio: $("track_audio").value,
+            subtitle: $("track_subtitle").value,
+          },
+          metadata: readKv($("metaRows")),
+          disposition: readKv($("dispRows")),
+          extra_args: $("extra_args").value,
+          delete_original: $("delete_original").checked,
+          rename_from: editingFrom,
+        };
+      }
+
+      function apply(spec) {
+        const v = spec.video_params || {};
+        const a = spec.audio_params || {};
+        const t = spec.tracks || {};
+        $("name").value = spec.name || "";
+        $("container").value = spec.container || "mkv";
+        $("resolution").value = spec.resolution || "source";
+        $("is_default").checked = !!spec.is_default;
+        $("video_codec").value = spec.video_codec || "copy";
+        $("audio_codec").value = spec.audio_codec || "copy";
+        $("subtitle_mode").value = spec.subtitle_mode || "copy";
+        syncPresets(String(v.preset ?? ""));
+        $("crf").value = v.crf ?? 24;
+        $("pix_fmt").value = v.pix_fmt || "";
+        $("v_profile").value = v.profile || "";
+        $("v_level").value = v.level || "";
+        $("extra_params").value = v.extra_params || "";
+        $("color_primaries").value = v.color_primaries || "";
+        $("color_trc").value = v.color_trc || "";
+        $("colorspace").value = v.colorspace || "";
+        $("audio_bitrate").value = (a.bitrate || "").replace("k", "");
+        $("audio_channels").value = a.channels || "";
+        $("audio_vbr").checked = !!a.vbr;
+        $("track_video").value = t.video || "0";
+        $("track_audio").value = t.audio || "?";
+        $("track_subtitle").value = t.subtitle || "?";
+        $("extra_args").value = spec.extra_args || "";
+        $("delete_original").checked = !!spec.delete_original;
+        $("metaRows").innerHTML = "";
+        Object.entries(spec.metadata || {}).forEach(([k, val]) =>
+          kvRow($("metaRows"), k, val));
+        $("dispRows").innerHTML = "";
+        Object.entries(spec.disposition || {}).forEach(([k, val]) =>
+          kvRow($("dispRows"), k, val, DISPOSITIONS));
+        preview();
+      }
+
+      function setMsg(text, ok) {
+        const m = $("msg");
+        m.textContent = text;
+        m.className = "u-msg " + (ok ? "ok" : "err");
+      }
+
+      function setEditing(name) {
+        editingFrom = name;
+        const note = $("editingNote");
+        note.classList.toggle("hide", !name);
+        if (name) note.textContent = `Editing "${name}" — saving updates it.`;
+      }
+
+      let timer = null;
+      async function preview() {
+        $("crfv").textContent = $("crf").value;
+        const vCopy = $("video_codec").value === "copy";
+        ["crf", "preset", "pix_fmt", "resolution", "v_profile", "v_level",
+         "extra_params", "color_primaries", "color_trc", "colorspace"]
+          .forEach((id) => ($(id).disabled = vCopy));
+        const aCopy = $("audio_codec").value === "copy";
+        ["audio_bitrate", "audio_channels", "audio_vbr"]
+          .forEach((id) => ($(id).disabled = aCopy));
+
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          try {
+            const r = await fetch("/api/encode/preview?" + AUTH, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(collect()),
+            });
+            const j = await r.json();
+            $("preview").textContent = j.command || j.error || "—";
+          } catch (e) {
+            $("preview").textContent = "preview failed";
+          }
+        }, 150);
+      }
+
+      async function loadProfiles() {
+        const box = $("profiles");
+        try {
+          const r = await fetch("/api/encode/profiles?" + AUTH);
+          const j = await r.json();
+          const specs = j.specs || {};
+          const names = Object.keys(j.profiles || {});
+          if (!names.length) {
+            box.innerHTML =
+              '<span class="u-empty">No profiles yet — build one below.</span>';
+            return;
+          }
+          box.innerHTML = "";
+          names.forEach((n) => {
+            const spec = specs[n];
+            const chip = document.createElement("div");
+            chip.className = "u-chip prof-chip";
+            chip.title = (j.profiles[n] || []).join("\n");
+
+            if (spec && spec.is_default) {
+              const star = document.createElement("span");
+              star.className = "star"; star.textContent = "★";
+              chip.appendChild(star);
+            }
+            const label = document.createElement("b");
+            label.textContent = n;
+            label.title = "click to edit";
+            label.onclick = () => {
+              if (!spec) { setMsg("This profile has no editable spec.", false); return; }
+              apply({ ...spec, name: n });
+              setEditing(n);
+              setMsg(`Loaded "${n}"`, true);
+              window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+            };
+            chip.appendChild(label);
+
+            if (spec && !spec.is_default) {
+              const star = document.createElement("span");
+              star.className = "act"; star.textContent = "☆";
+              star.title = "set as default";
+              star.onclick = async () => {
+                const d = await fetch(
+                  `/api/encode/profiles/${encodeURIComponent(n)}/default?` + AUTH,
+                  { method: "POST" });
+                const dj = await d.json();
+                setMsg(dj.ok ? `${n} is now default` : dj.error, dj.ok);
+                loadProfiles();
+              };
+              chip.appendChild(star);
+            }
+
+            const x = document.createElement("span");
+            x.className = "act del"; x.textContent = "×"; x.title = "delete";
+            x.onclick = async () => {
+              if (!confirm(`Delete profile "${n}"?`)) return;
+              const d = await fetch(
+                `/api/encode/profiles/${encodeURIComponent(n)}?` + AUTH,
+                { method: "DELETE" });
+              const dj = await d.json();
+              setMsg(dj.ok ? "Deleted " + n : dj.error || "delete failed", dj.ok);
+              if (editingFrom === n) setEditing(null);
+              loadProfiles();
+            };
+            chip.appendChild(x);
+            box.appendChild(chip);
+          });
+        } catch (e) {
+          box.innerHTML = '<span class="u-msg err">Failed to load.</span>';
+        }
+      }
+
+      $("save").onclick = async () => {
+        const r = await fetch("/api/encode/profiles?" + AUTH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(collect()),
+        });
+        const j = await r.json();
+        setMsg(j.ok ? "Saved" : j.error || "save failed", j.ok);
+        $("useHint").innerHTML = j.ok
+          ? `Use it on a task: <code>/leech &lt;link&gt; -ff ${j.name}</code>`
+          : "";
+        if (j.ok) { setEditing(null); loadProfiles(); }
+      };
+
+      $("reset").onclick = () => {
+        setEditing(null);
+        apply({ video_codec: "libx265", audio_codec: "copy", container: "mkv" });
+        $("name").value = "";
+        setMsg("", true);
+      };
+
+      document.querySelectorAll(".tpl").forEach((btn) => {
+        btn.onclick = () => {
+          const t = TEMPLATES[btn.dataset.tpl];
+          if (!t) return;
+          setEditing(null);
+          apply(JSON.parse(JSON.stringify(t)));
+          setMsg(`Loaded template "${t.name.replace(/_/g, " ")}"`, true);
+        };
+      });
+
+      $("copyCmd").onclick = async () => {
+        const btn = $("copyCmd");
+        try {
+          await navigator.clipboard.writeText($("preview").textContent);
+          btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        } catch (e) {
+          btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        }
+        setTimeout(() => {
+          btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+        }, 1600);
+      };
+
+      $("video_codec").addEventListener("change", () => { syncPresets(); preview(); });
+      document.querySelectorAll("input, select").forEach((el) => {
+        el.addEventListener("input", preview);
+        el.addEventListener("change", preview);
+      });
+      $("addMeta").onclick = () => kvRow($("metaRows"), "", "");
+      $("addDisp").onclick = () => kvRow($("dispRows"), "", "", DISPOSITIONS);
+
+      syncPresets();
+      preview();
+      loadProfiles();
+    </script>
+  </body>
+</html>
